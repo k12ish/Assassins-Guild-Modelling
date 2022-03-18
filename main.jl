@@ -18,6 +18,11 @@ function show_graph(g)
 end
 
 # ╔═╡ bd4a962f-3888-49fc-ba79-1d8f4e9934d7
+"""
+fill input graph so that each node has a certain number of outneighbours and inneighbours
+
+Since this function is random, it is not guarenteed to produce a valid result; it will return false if the input graph cannot be fully filled.
+"""
 function fill_true_random!(graph, N, num_targets=3)
 	for i in 1:N
 		targets_to_add = num_targets - length(outneighbors(graph, i))
@@ -51,7 +56,7 @@ function true_random_graph(N, targets=3)
 end
 
 # ╔═╡ a015e94a-ff27-4454-80ca-ba42e05c1c06
-show_graph(true_random_graph(7, 2))
+show_graph(true_random_graph(10, 2))
 
 # ╔═╡ f5e0b873-dfe4-42bf-a0b3-04620530e53a
 function random_on_circular_graph(N, targets=3)
@@ -65,12 +70,29 @@ function random_on_circular_graph(N, targets=3)
 end
 
 # ╔═╡ 78e14371-101e-4d59-ab2e-5d87eba134af
-show_graph(random_on_circular_graph(7, 2))
+show_graph(random_on_circular_graph(10, 2))
+
+# ╔═╡ 8703e743-a329-4dd7-b944-c4f038b1bd59
+md"""
+# Assigning the Players
+"""
+
+# ╔═╡ 881a8105-b801-4794-b683-ace203b5d90a
+SKILL_DISTRIBUTION = Pareto(1.7, 0.001)
+
+# ╔═╡ 089fe987-e5ca-4050-9c01-1075ac6aae0f
+begin
+	player_skills = rand(SKILL_DISTRIBUTION, 300)
+	maximum(player_skills) / minimum(player_skills)
+end
+
+# ╔═╡ bb82c08a-fab8-455b-ae99-4f5d81e5cb69
+dists = floyd_warshall_shortest_paths(true_random_graph(5, 2)).dists
 
 # ╔═╡ 60ae5ae1-1215-4ea4-ad3b-0217307f68fd
 begin
-	N_samples = 1000
-	N_assasins = 500
+	N_samples = 500
+	N_assasins = 200
 	targets = 3
 
 	G_r = [true_random_graph(N_assasins,targets) for i in 1:N_samples]
@@ -83,6 +105,9 @@ begin
 	plot!(fit(Normal, global_clustering_coefficient.(G_r)), label="True random")
 	plot!(fit(Normal, global_clustering_coefficient.(G_c)), label="Random on Circular")
 end
+
+# ╔═╡ bf374e51-eb1a-4003-9e08-b5124d013e53
+arr = global_clustering_coefficient.(G_r)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -510,6 +535,12 @@ git-tree-sha1 = "f6250b16881adf048549549fba48b1161acdac8c"
 uuid = "c1c5ebd0-6772-5130-a774-d5fcae4a789d"
 version = "3.100.1+0"
 
+[[LERC_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "bf36f528eec6634efc60d7ec062008f171071434"
+uuid = "88015f11-f218-50d7-93a8-a6af411a945d"
+version = "3.0.0+1"
+
 [[LZO_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "e5b909bcf985c5e2605737d2ce278ed791b89be6"
@@ -587,10 +618,10 @@ uuid = "4b2f31a3-9ecc-558c-b454-b3730dcb73e9"
 version = "2.35.0+0"
 
 [[Libtiff_jll]]
-deps = ["Artifacts", "JLLWrappers", "JpegTurbo_jll", "Libdl", "Pkg", "Zlib_jll", "Zstd_jll"]
-git-tree-sha1 = "340e257aada13f95f98ee352d316c3bed37c8ab9"
+deps = ["Artifacts", "JLLWrappers", "JpegTurbo_jll", "LERC_jll", "Libdl", "Pkg", "Zlib_jll", "Zstd_jll"]
+git-tree-sha1 = "c9551dd26e31ab17b86cbd00c2ede019c08758eb"
 uuid = "89763e89-9b03-5906-acba-b20f662cd828"
-version = "4.3.0+0"
+version = "4.3.0+1"
 
 [[Libuuid_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1229,9 +1260,14 @@ version = "0.9.1+5"
 # ╟─bd4a962f-3888-49fc-ba79-1d8f4e9934d7
 # ╟─ee20e64f-0761-4abc-b02f-f451acea3e83
 # ╠═a015e94a-ff27-4454-80ca-ba42e05c1c06
-# ╟─f5e0b873-dfe4-42bf-a0b3-04620530e53a
+# ╠═f5e0b873-dfe4-42bf-a0b3-04620530e53a
 # ╠═78e14371-101e-4d59-ab2e-5d87eba134af
+# ╟─8703e743-a329-4dd7-b944-c4f038b1bd59
+# ╠═881a8105-b801-4794-b683-ace203b5d90a
+# ╠═089fe987-e5ca-4050-9c01-1075ac6aae0f
+# ╠═bb82c08a-fab8-455b-ae99-4f5d81e5cb69
 # ╠═60ae5ae1-1215-4ea4-ad3b-0217307f68fd
-# ╠═bec684c7-83d2-439e-95f5-665e7221d94a
+# ╟─bec684c7-83d2-439e-95f5-665e7221d94a
+# ╠═bf374e51-eb1a-4003-9e08-b5124d013e53
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
