@@ -77,17 +77,68 @@ md"""
 # Assigning the Players
 """
 
+# ╔═╡ c19a3c9e-ef55-413e-b679-2498b5698afb
+n = 10
+
 # ╔═╡ 881a8105-b801-4794-b683-ace203b5d90a
 SKILL_DISTRIBUTION = Pareto(1.7, 0.001)
 
 # ╔═╡ 089fe987-e5ca-4050-9c01-1075ac6aae0f
 begin
-	player_skills = rand(SKILL_DISTRIBUTION, 300)
+	player_skills = rand(SKILL_DISTRIBUTION, n)
 	maximum(player_skills) / minimum(player_skills)
 end
 
+# ╔═╡ c5ba70cd-454c-4550-a97a-cd76ceb7fb66
+x = random_on_circular_graph(n, 3)
+
+# ╔═╡ 7f5ec11e-28fc-44e7-834a-628390443444
+graphplot(x, node_weights=player_skills, names = 1:n, curves=false)
+
 # ╔═╡ bb82c08a-fab8-455b-ae99-4f5d81e5cb69
-dists = floyd_warshall_shortest_paths(true_random_graph(5, 2)).dists
+dists = floyd_warshall_shortest_paths(x).dists
+
+# ╔═╡ b1a6f2bb-5b09-4956-8e3a-6d11882179ff
+md"""
+# Simulating the game
+"""
+
+# ╔═╡ 641c6778-3db3-4640-8377-3c709f5cab0b
+function retargeting_list(graph, attacker_nodes, target_nodes)
+	@assert length(attacker_nodes) == length(target_nodes)
+	n = length(attacker_nodes)
+	
+	bitmat = falses(n, n)
+	for a in 1:n
+		for t in 1:n
+			a_node, t_node = attacker_nodes[a], target_nodes[t]
+			# A new valid target for an assassin is 
+			# - Not themselves
+			# - Not someone they are targeting / is targeting them
+			bitmat[a, t] = a_node ≠ t_node && a_node ∉ all_neighbors(graph, t_node)
+		end
+	end
+	bitmat
+end
+
+# ╔═╡ c3dff3cf-6c59-436d-8d62-8ec92727145b
+"""
+When a player dies, there are 7 nodes involved:
+- Player's Node, labelled A
+- Nodes that attack player, labelled BCD
+- Nodes that player attacks, labelled EFG
+
+Complications arise if there already exists a relationship between BCD and EFG.
+
+"""
+function update_kill_increment!(graph, index)
+	BCD = inneighbors(graph, index)
+	EFG = outneighbors(graph, index)
+	retargeting_list(graph, BCD, EFG)
+end
+
+# ╔═╡ c1d0f8e0-eef3-4769-bef2-07236b861239
+update_kill_increment!(x, 7)
 
 # ╔═╡ 60ae5ae1-1215-4ea4-ad3b-0217307f68fd
 begin
@@ -1263,9 +1314,16 @@ version = "0.9.1+5"
 # ╠═f5e0b873-dfe4-42bf-a0b3-04620530e53a
 # ╠═78e14371-101e-4d59-ab2e-5d87eba134af
 # ╟─8703e743-a329-4dd7-b944-c4f038b1bd59
+# ╠═c19a3c9e-ef55-413e-b679-2498b5698afb
 # ╠═881a8105-b801-4794-b683-ace203b5d90a
 # ╠═089fe987-e5ca-4050-9c01-1075ac6aae0f
-# ╠═bb82c08a-fab8-455b-ae99-4f5d81e5cb69
+# ╠═c5ba70cd-454c-4550-a97a-cd76ceb7fb66
+# ╠═7f5ec11e-28fc-44e7-834a-628390443444
+# ╟─bb82c08a-fab8-455b-ae99-4f5d81e5cb69
+# ╟─b1a6f2bb-5b09-4956-8e3a-6d11882179ff
+# ╟─c3dff3cf-6c59-436d-8d62-8ec92727145b
+# ╠═641c6778-3db3-4640-8377-3c709f5cab0b
+# ╠═c1d0f8e0-eef3-4769-bef2-07236b861239
 # ╠═60ae5ae1-1215-4ea4-ad3b-0217307f68fd
 # ╟─bec684c7-83d2-439e-95f5-665e7221d94a
 # ╠═bf374e51-eb1a-4003-9e08-b5124d013e53
