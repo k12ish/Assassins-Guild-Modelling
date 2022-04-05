@@ -10,6 +10,12 @@ using Graphs, Plots, GraphRecipes, StatsBase, StatsPlots, Distributions
 # ╔═╡ 2559a3eb-0173-43fb-886e-850a6cb385c5
 md"""
 # Creating the Graph
+
+Invariants:
+- Every assassin targets three unique assassins
+- Every assassin is targeted by 3 unique assassins
+- An assassin cannot target themselves
+
 """
 
 # ╔═╡ ba97449c-5bb0-45f5-918c-86019db44837
@@ -102,6 +108,109 @@ dists = floyd_warshall_shortest_paths(x).dists
 # ╔═╡ b1a6f2bb-5b09-4956-8e3a-6d11882179ff
 md"""
 # Simulating the game
+
+When an assassin dies, we must modify 7 nodes:
+
+- one node for the dead assassin
+- three nodes that attack the assassin
+- three nodes that assassin used to attack
+
+
+If we label these nodes with letters from A to F, we can describe this situation succinctly:
+
+```
+    A -> _
+    B -> _
+    C -> _
+    _ -> D
+    _ -> E
+    _ -> F
+```
+
+After a player dies, three assassins are missing a target and three targets are missing an assassin. In the simplest case, there's a total of six possible solutions:
+
+```
+Problem:
+
+    A -> _
+    B -> _
+    C -> _
+    _ -> D
+    _ -> E
+    _ -> F
+
+------------------------------------------------------
+
+Solution #1:        Solution #2:        Solution #3:
+    A -> D              A -> E              A -> F  
+    B -> E              B -> D              B -> D  
+    C -> F              C -> F              C -> E  
+            
+Solution #4:        Solution #5:        Solution #6:
+    A -> D              A -> E              A -> F  
+    B -> F              B -> F              B -> E  
+    C -> E              C -> D              C -> D  
+```
+
+Analysis becomes more difficult when there are preexisting relationships between `ABC` and `DEF`.
+Considering the previous example, suppose that `A` also targets `D`. Now solutions #1 and #4 are invalid, since `A` cannot target `D` twice.
+
+Consider a more complicated problem which we solve in a series of intermediary steps:
+```
+Problem:
+
+    A -> _
+    A -> E
+    B -> _
+    B -> F
+    C -> _
+    C -> D
+    _ -> D
+    _ -> E
+    _ -> F
+
+------------------------------------------------------
+
+Assassin A targets D:
+
+    A -> D
+    A -> E
+    B -> _
+    B -> F
+    C -> _
+    C -> D
+    _ -> E
+    _ -> F
+
+Assassin B targets E:
+
+    A -> D
+    A -> E
+    B -> E
+    B -> F
+    C -> _
+    C -> D
+    _ -> F
+
+Assassin C targets F:
+
+    A -> D
+    A -> E
+    B -> E
+    B -> F
+    C -> D
+    C -> F
+```
+
+Note that there is only one solution to this problem. If we added more constraints, the problem would become unsolveable.
+
+In general, there are three types of solutions to these problems:
+
+1) Many combinations of targeting pairs are valid (`Indeterminate`)
+2) One combination of targeting pairs is valid (`Determinate`)
+3) No combinations of targeting pairs are valid (`Unsolveable`)
+
+
 """
 
 # ╔═╡ 72f41f22-e3a0-4e5b-9751-5f625beb7610
@@ -207,12 +316,6 @@ end
 
 # ╔═╡ c3dff3cf-6c59-436d-8d62-8ec92727145b
 """
-When a player dies, there are 7 nodes involved:
-- Player's Node, labelled A
-- Nodes that attack player, labelled BCD
-- Nodes that player attacks, labelled EFG
-
-Complications arise if there already exists a relationship between BCD and EFG.
 
 """
 function update_kill_increment!(graph, index)
@@ -1418,7 +1521,7 @@ version = "0.9.1+5"
 # ╟─bb82c08a-fab8-455b-ae99-4f5d81e5cb69
 # ╟─b1a6f2bb-5b09-4956-8e3a-6d11882179ff
 # ╠═72f41f22-e3a0-4e5b-9751-5f625beb7610
-# ╟─c3dff3cf-6c59-436d-8d62-8ec92727145b
+# ╠═c3dff3cf-6c59-436d-8d62-8ec92727145b
 # ╠═641c6778-3db3-4640-8377-3c709f5cab0b
 # ╠═e0ff4d0d-7a03-477c-89c1-b32acffe7fce
 # ╠═2bb60369-0eef-4488-be37-9ef10e641f0b
