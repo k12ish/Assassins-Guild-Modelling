@@ -60,13 +60,14 @@ show_graph(true_random_graph(10, 2))
 
 # ╔═╡ f5e0b873-dfe4-42bf-a0b3-04620530e53a
 function random_on_circular_graph(N, targets=3)
-	for i in 1:10
+	for i in 1:1000
 		graph = cycle_digraph(N)
 		success = fill_true_random!(graph, N, targets)
 		if success
 			return graph
 		end
 	end
+	Exception()
 end
 
 # ╔═╡ 78e14371-101e-4d59-ab2e-5d87eba134af
@@ -78,7 +79,7 @@ md"""
 """
 
 # ╔═╡ c19a3c9e-ef55-413e-b679-2498b5698afb
-n = 10
+n = 11
 
 # ╔═╡ 881a8105-b801-4794-b683-ace203b5d90a
 SKILL_DISTRIBUTION = Pareto(1.7, 0.001)
@@ -103,12 +104,94 @@ md"""
 # Simulating the game
 """
 
+# ╔═╡ 72f41f22-e3a0-4e5b-9751-5f625beb7610
+begin
+	abstract type GraphResult end
+	struct Determinate <: GraphResult end
+	struct Indeterminate <: GraphResult 
+		inner::BitMatrix
+	end
+	struct Unsolveable <: GraphResult end
+end
+
+# ╔═╡ e0ff4d0d-7a03-477c-89c1-b32acffe7fce
+function simplify_bitmat(bitmat, attacker_nodes, target_nodes)
+	@assert length(attacker_nodes) == length(target_nodes)
+	n = length(attacker_nodes)
+
+    pair_indexes = []
+    finished = false
+
+    while !finished
+		finished = true
+	    # If assassin a has only one valid target t, then a must target t
+		for a in 1:n
+			num_valid_targets = sum(bitmat[a, :])
+			if num_valid_targets == 1
+                # find index of only valid target
+				t = findfirst(bitmat[a, :])
+				push!(pair_indexes, (a, t))
+                # the assassin and the target are no longer valid partners
+                # for other players, so we update the bitmatrix
+				bitmat[a, :] .= false
+				bitmat[:, t] .= false
+
+				finished = false
+			end
+		end
+	    # If target t has only one valid assassin a, then a must target t
+		for t in 1:n
+			num_valid_assassins = sum(bitmat[:, t])
+			if num_valid_assassins == 1
+                # find index of only valid asssassin
+				a = findfirst(bitmat[:, t])
+				push!(pair_indexes, (a, t))
+                # the assassin and the target are no longer valid partners
+                # for other players, so we update the bitmatrix
+				bitmat[a, :] .= false
+				bitmat[:, t] .= false
+
+				finished = false
+			end
+		end
+    end
+	# remove rows and columns corresponding with assassins and targets that
+	# have been paired up
+	bitmat = bitmat[
+		setdiff(1:end, [a for (a, t) in pair_indexes]),
+		setdiff(1:end, [t for (a, t) in pair_indexes]),
+	]
+	pairs = [(attacker_nodes[a], target_nodes[t]) for (a,t) in pair_indexes]
+
+	# if bitmat is empty, then we have deduced all pairings
+	if length(bitmat) == 0
+        return Determinate(), pairs
+	end
+
+    # if any remaining assassin/target has no valid partner, then the targeting
+    # matrix is unsatistfiable
+	for row in eachrow(bitmat)
+		if sum(row) == 0
+            return Unsolveable(), pairs
+		end
+	end
+	for col in eachcol(bitmat)
+		if sum(row) == 0
+            return Unsolveable(), pairs
+		end
+	end
+    Indeterminate(bitmat), pairs
+end
+
 # ╔═╡ 641c6778-3db3-4640-8377-3c709f5cab0b
-function retargeting_list(graph, attacker_nodes, target_nodes)
+function deduce_targets(graph, attacker_nodes, target_nodes)
 	@assert length(attacker_nodes) == length(target_nodes)
 	n = length(attacker_nodes)
 	
 	bitmat = falses(n, n)
+	# bitmat is an n x n bitmatrix that represents if a player can attack 
+    # another player
+	# bitmat[a, t] is true if assassin a can attack target t
 	for a in 1:n
 		for t in 1:n
 			a_node, t_node = attacker_nodes[a], target_nodes[t]
@@ -118,7 +201,8 @@ function retargeting_list(graph, attacker_nodes, target_nodes)
 			bitmat[a, t] = a_node ≠ t_node && a_node ∉ all_neighbors(graph, t_node)
 		end
 	end
-	bitmat
+    bitmat, targeting_pairs = simplify_bitmat(bitmat, attacker_nodes, target_nodes)
+    bitmat, targeting_pairs
 end
 
 # ╔═╡ c3dff3cf-6c59-436d-8d62-8ec92727145b
@@ -134,11 +218,23 @@ Complications arise if there already exists a relationship between BCD and EFG.
 function update_kill_increment!(graph, index)
 	BCD = inneighbors(graph, index)
 	EFG = outneighbors(graph, index)
-	retargeting_list(graph, BCD, EFG)
+	target_pairs, bitmat = deduce_targets(graph, BCD, EFG)
 end
 
-# ╔═╡ c1d0f8e0-eef3-4769-bef2-07236b861239
-update_kill_increment!(x, 7)
+# ╔═╡ 2bb60369-0eef-4488-be37-9ef10e641f0b
+update_kill_increment!(x, 1)
+
+# ╔═╡ 20e87ea1-c996-4110-86ff-63b84fc7747e
+update_kill_increment!(x, 2)
+
+# ╔═╡ f470b6af-640c-4586-a943-caedc1297fec
+update_kill_increment!(x, 3)
+
+# ╔═╡ 38eb5f59-9851-4840-b921-8316f6b83cde
+update_kill_increment!(x, 4)
+
+# ╔═╡ cb0f1e65-3fbc-4d1d-b31f-de546fe3d4da
+update_kill_increment!(x, 5)
 
 # ╔═╡ 60ae5ae1-1215-4ea4-ad3b-0217307f68fd
 begin
@@ -1307,7 +1403,7 @@ version = "0.9.1+5"
 # ╔═╡ Cell order:
 # ╠═cbbb1952-8c58-11ec-2379-69a3044552c9
 # ╟─2559a3eb-0173-43fb-886e-850a6cb385c5
-# ╟─ba97449c-5bb0-45f5-918c-86019db44837
+# ╠═ba97449c-5bb0-45f5-918c-86019db44837
 # ╟─bd4a962f-3888-49fc-ba79-1d8f4e9934d7
 # ╟─ee20e64f-0761-4abc-b02f-f451acea3e83
 # ╠═a015e94a-ff27-4454-80ca-ba42e05c1c06
@@ -1321,9 +1417,15 @@ version = "0.9.1+5"
 # ╠═7f5ec11e-28fc-44e7-834a-628390443444
 # ╟─bb82c08a-fab8-455b-ae99-4f5d81e5cb69
 # ╟─b1a6f2bb-5b09-4956-8e3a-6d11882179ff
+# ╠═72f41f22-e3a0-4e5b-9751-5f625beb7610
 # ╟─c3dff3cf-6c59-436d-8d62-8ec92727145b
 # ╠═641c6778-3db3-4640-8377-3c709f5cab0b
-# ╠═c1d0f8e0-eef3-4769-bef2-07236b861239
+# ╠═e0ff4d0d-7a03-477c-89c1-b32acffe7fce
+# ╠═2bb60369-0eef-4488-be37-9ef10e641f0b
+# ╠═20e87ea1-c996-4110-86ff-63b84fc7747e
+# ╠═f470b6af-640c-4586-a943-caedc1297fec
+# ╠═38eb5f59-9851-4840-b921-8316f6b83cde
+# ╠═cb0f1e65-3fbc-4d1d-b31f-de546fe3d4da
 # ╠═60ae5ae1-1215-4ea4-ad3b-0217307f68fd
 # ╟─bec684c7-83d2-439e-95f5-665e7221d94a
 # ╠═bf374e51-eb1a-4003-9e08-b5124d013e53
