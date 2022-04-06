@@ -23,6 +23,36 @@ function show_graph(g)
 	graphplot(g, curves=false, nodeshape=:circle)
 end
 
+# ╔═╡ b35d4a16-512e-478d-9b67-ad2172dede06
+"""
+Show all nodes that are one degree of separation from a particular node
+"""
+function show_graph_around(g, index)
+    nodes_to_show = vcat([index], all_neighbors(g, index))
+    mapping = Dict(old => new for (new, old) in enumerate(nodes_to_show))
+    new_graph = DiGraph(length(mapping))
+	
+    for (old_idx, new_idx) in mapping
+        for neigh in outneighbors(g, old_idx)
+            if neigh in nodes_to_show
+                add_edge!(new_graph, new_idx, mapping[neigh]) 
+            end
+        end
+    end
+	node_weights = vcat([3], fill(1, length(nodes_to_show) - 1))
+	markercolor = vcat([2], fill(1, length(nodes_to_show) - 1))
+	graphplot(
+		new_graph, 
+		method=:circular,
+		nodeshape=:circle,
+		names=nodes_to_show, 
+		node_weights=node_weights,
+		markercolor=markercolor,
+		curves=false,
+		node_size=0.2
+	)
+end
+
 # ╔═╡ bd4a962f-3888-49fc-ba79-1d8f4e9934d7
 """
 fill input graph so that each node has a certain number of outneighbours and inneighbours
@@ -97,7 +127,10 @@ begin
 end
 
 # ╔═╡ c5ba70cd-454c-4550-a97a-cd76ceb7fb66
-x = random_on_circular_graph(n, 3)
+x = random_on_circular_graph(n, 2)
+
+# ╔═╡ dda6ac41-3009-41b2-99de-ba1c5b3514c0
+show_graph_around(x, 2)
 
 # ╔═╡ 7f5ec11e-28fc-44e7-834a-628390443444
 graphplot(x, node_weights=player_skills, names = 1:n, curves=false)
@@ -219,6 +252,8 @@ begin
 	struct Determinate <: GraphResult end
 	struct Indeterminate <: GraphResult 
 		inner::BitMatrix
+		attackers::Vector{Int64}
+		targets::Vector{Int64}
 	end
 	struct Unsolveable <: GraphResult end
 end
@@ -266,11 +301,13 @@ function simplify_bitmat(bitmat, attacker_nodes, target_nodes)
     end
 	# remove rows and columns corresponding with assassins and targets that
 	# have been paired up
+	pairs = [(attacker_nodes[a], target_nodes[t]) for (a,t) in pair_indexes]
 	bitmat = bitmat[
 		setdiff(1:end, [a for (a, t) in pair_indexes]),
 		setdiff(1:end, [t for (a, t) in pair_indexes]),
 	]
-	pairs = [(attacker_nodes[a], target_nodes[t]) for (a,t) in pair_indexes]
+	attacker_nodes = attacker_nodes[setdiff(1:end, [t for (a, t) in pair_indexes])]
+	target_nodes = target_nodes[setdiff(1:end, [t for (a, t) in pair_indexes])]
 
 	# if bitmat is empty, then we have deduced all pairings
 	if length(bitmat) == 0
@@ -285,11 +322,11 @@ function simplify_bitmat(bitmat, attacker_nodes, target_nodes)
 		end
 	end
 	for col in eachcol(bitmat)
-		if sum(row) == 0
+		if sum(col) == 0
             return Unsolveable(), pairs
 		end
 	end
-    Indeterminate(bitmat), pairs
+    Indeterminate(bitmat, attacker_nodes, target_nodes), pairs
 end
 
 # ╔═╡ 641c6778-3db3-4640-8377-3c709f5cab0b
@@ -310,19 +347,21 @@ function deduce_targets(graph, attacker_nodes, target_nodes)
 			bitmat[a, t] = a_node ≠ t_node && a_node ∉ all_neighbors(graph, t_node)
 		end
 	end
-    bitmat, targeting_pairs = simplify_bitmat(bitmat, attacker_nodes, target_nodes)
-    bitmat, targeting_pairs
+    res, pairs = simplify_bitmat(bitmat, attacker_nodes, target_nodes)
+    res, pairs
 end
 
 # ╔═╡ c3dff3cf-6c59-436d-8d62-8ec92727145b
 """
-
 """
 function update_kill_increment!(graph, index)
 	BCD = inneighbors(graph, index)
 	EFG = outneighbors(graph, index)
 	target_pairs, bitmat = deduce_targets(graph, BCD, EFG)
 end
+
+# ╔═╡ dbd9ddcf-cefe-4f56-adb3-fed3a6671552
+show_graph_around(x, 1)
 
 # ╔═╡ 2bb60369-0eef-4488-be37-9ef10e641f0b
 update_kill_increment!(x, 1)
@@ -1507,6 +1546,8 @@ version = "0.9.1+5"
 # ╠═cbbb1952-8c58-11ec-2379-69a3044552c9
 # ╟─2559a3eb-0173-43fb-886e-850a6cb385c5
 # ╠═ba97449c-5bb0-45f5-918c-86019db44837
+# ╟─b35d4a16-512e-478d-9b67-ad2172dede06
+# ╠═dda6ac41-3009-41b2-99de-ba1c5b3514c0
 # ╟─bd4a962f-3888-49fc-ba79-1d8f4e9934d7
 # ╟─ee20e64f-0761-4abc-b02f-f451acea3e83
 # ╠═a015e94a-ff27-4454-80ca-ba42e05c1c06
@@ -1522,8 +1563,9 @@ version = "0.9.1+5"
 # ╟─b1a6f2bb-5b09-4956-8e3a-6d11882179ff
 # ╠═72f41f22-e3a0-4e5b-9751-5f625beb7610
 # ╠═c3dff3cf-6c59-436d-8d62-8ec92727145b
-# ╠═641c6778-3db3-4640-8377-3c709f5cab0b
-# ╠═e0ff4d0d-7a03-477c-89c1-b32acffe7fce
+# ╟─641c6778-3db3-4640-8377-3c709f5cab0b
+# ╟─e0ff4d0d-7a03-477c-89c1-b32acffe7fce
+# ╠═dbd9ddcf-cefe-4f56-adb3-fed3a6671552
 # ╠═2bb60369-0eef-4488-be37-9ef10e641f0b
 # ╠═20e87ea1-c996-4110-86ff-63b84fc7747e
 # ╠═f470b6af-640c-4586-a943-caedc1297fec
