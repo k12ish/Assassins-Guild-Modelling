@@ -275,10 +275,41 @@ In general, there are three types of solutions to these problems:
 end
 
 # ╔═╡ 42c0d848-4672-4657-a37c-39e6f4fc03c4
+"""
+
+The full game involves hundreds of people. 
+To avoid costly operations on a large graph, `RetargetingState` replicates a small portion of the graph inside a bitmatrix.
+
+**Core invariants:**
+
+1) The graph always remains valid after:
+
+    - any number of `(a, t)` tuples that occur in `pairs` is added to it
+    - any one relationship `(a, t)` is added such that `bitmat[a][t] == true`
+
+2) `length(attack_indexes) == length(attack_counts)` and likewise for targets.
+
+3) `sum(attack_counts) == sum(target_counts)`
+
+**Smaller invariants:**
+
+- `bitmat`
+    - `bitmat[a][t] == true` if `(a, t)` is a valid relationship in the graph
+
+- `attack_indexes` and `target_indexes`
+    - `attack_indexes[a]` returns the index of assassin `a` in the graph
+
+- `attack_counts` and `target_counts`
+    - `attacker_counts[a]` represents the number of targets assassin `a` requires
+    - `target_counts[a]` represents the number of assassins target `t` requires
+
+"""
 mutable struct RetargetingState
 	bitmat::BitMatrix
-	attack_nodes::Vector{Int64}
-	target_nodes::Vector{Int64}
+	attack_indexes::Vector{Int64}
+	target_indexes::Vector{Int64}
+	attack_counts::Vector{UInt8}
+	target_counts::Vector{UInt8}
     pairs::Vector{Tuple{Int64, Int64}}
 end
 
@@ -286,17 +317,31 @@ end
 """
 Creates a new `RetargetingState` object
 """
-function new_retargeting_state(graph::SimpleDiGraph, attack_nodes::Vector{Int64}, target_nodes::Vector{Int64})
-	@assert length(attack_nodes) == length(target_nodes)
-	n = length(attack_nodes)
+function new_retargeting_state(graph::SimpleDiGraph, attack_nodes, target_nodes)
+
+    attack_indexes = Vector{Int64}()
+    target_indexes = Vector{Int64}()
+    attack_counts = Vector{UInt8}()
+    target_counts = Vector{UInt8}()
+
+    for (index, count) in attack_nodes
+        push!(attack_indexes, index)
+        push!(attack_counts, count)
+    end
+    
+    for (index, count) in target_nodes
+        push!(target_indexes, index)
+        push!(target_counts, count)
+    end
+    
+	A = length(attack_indexes)
+	T = length(target_indexes)
 	
-	bitmat = falses(n, n)
-	# bitmat is an n x n bitmatrix that represents if a player can attack 
-    # another player
+	bitmat = falses(A, T)
 	# bitmat[a, t] is true if assassin a can attack target t
-	for a in 1:n
-		for t in 1:n
-			a_node, t_node = attack_nodes[a], target_nodes[t]
+	for a in 1:A
+		for t in 1:T
+			a_node, t_node = attack_indexes[a], target_indexes[t]
 			# A new valid target for an assassin is 
 			# - Not themselves
 			# - Not someone they are targeting / is targeting them
@@ -304,7 +349,9 @@ function new_retargeting_state(graph::SimpleDiGraph, attack_nodes::Vector{Int64}
 		end
 	end
 
-    RetargetingState(bitmat, attack_nodes, target_nodes, [])
+    RetargetingState(bitmat, 
+        attack_indexes, target_indexes, attack_counts, target_counts,
+     [])
 end
 
 # ╔═╡ 1fe0dbc1-1405-49f1-9ec6-ccb64a2657ab
@@ -395,24 +442,24 @@ Deduces targets internally using `RetargetingState` functions.
 """
 function deduce_targets(graph, attack_nodes, target_nodes)
 	state = new_retargeting_state(graph, attack_nodes, target_nodes)
-	res, state = simplify(state)
+	# res, state = simplify(state)
 end
+
+# ╔═╡ dbd9ddcf-cefe-4f56-adb3-fed3a6671552
+show_graph_around(x, 3)
 
 # ╔═╡ c3dff3cf-6c59-436d-8d62-8ec92727145b
 """
 """
 function update_kill_increment!(graph, index)
-	BCD = inneighbors(graph, index)
-	EFG = outneighbors(graph, index)
-	deduce_targets(graph, BCD, EFG)
+	attackers = inneighbors(graph, index) |> countmap
+	targets = outneighbors(graph, index) |> countmap
+	deduce_targets(graph, attackers, targets)
 end
 
 
-# ╔═╡ dbd9ddcf-cefe-4f56-adb3-fed3a6671552
-show_graph_around(x, 3)
-
 # ╔═╡ 2bb60369-0eef-4488-be37-9ef10e641f0b
-update_kill_increment!(x, 2)
+update_kill_increment!(x, 1)
 
 # ╔═╡ 20e87ea1-c996-4110-86ff-63b84fc7747e
 update_kill_increment!(x, 3)
@@ -1565,7 +1612,7 @@ version = "0.9.1+5"
 # ╠═cbbb1952-8c58-11ec-2379-69a3044552c9
 # ╟─2559a3eb-0173-43fb-886e-850a6cb385c5
 # ╟─ba97449c-5bb0-45f5-918c-86019db44837
-# ╠═b35d4a16-512e-478d-9b67-ad2172dede06
+# ╟─b35d4a16-512e-478d-9b67-ad2172dede06
 # ╟─dda6ac41-3009-41b2-99de-ba1c5b3514c0
 # ╟─bd4a962f-3888-49fc-ba79-1d8f4e9934d7
 # ╠═ee20e64f-0761-4abc-b02f-f451acea3e83
@@ -1581,13 +1628,13 @@ version = "0.9.1+5"
 # ╠═bb82c08a-fab8-455b-ae99-4f5d81e5cb69
 # ╟─b1a6f2bb-5b09-4956-8e3a-6d11882179ff
 # ╠═72f41f22-e3a0-4e5b-9751-5f625beb7610
-# ╠═42c0d848-4672-4657-a37c-39e6f4fc03c4
-# ╟─6018d10d-a0ce-460a-be91-9f98c8663f20
+# ╟─42c0d848-4672-4657-a37c-39e6f4fc03c4
+# ╠═6018d10d-a0ce-460a-be91-9f98c8663f20
 # ╟─1fe0dbc1-1405-49f1-9ec6-ccb64a2657ab
-# ╠═c3dff3cf-6c59-436d-8d62-8ec92727145b
 # ╠═641c6778-3db3-4640-8377-3c709f5cab0b
 # ╠═dbd9ddcf-cefe-4f56-adb3-fed3a6671552
 # ╠═2bb60369-0eef-4488-be37-9ef10e641f0b
 # ╠═20e87ea1-c996-4110-86ff-63b84fc7747e
+# ╠═c3dff3cf-6c59-436d-8d62-8ec92727145b
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
