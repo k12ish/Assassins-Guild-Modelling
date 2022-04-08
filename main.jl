@@ -258,6 +258,73 @@ begin
 	struct Unsolveable <: GraphResult end
 end
 
+# ╔═╡ 42c0d848-4672-4657-a37c-39e6f4fc03c4
+mutable struct RetargetingState
+	bitmat::BitMatrix
+	attack_nodes::Vector{Int64}
+	target_nodes::Vector{Int64}
+    pairs::Vector{Tuple{Int64, Int64}}
+end
+
+# ╔═╡ 6018d10d-a0ce-460a-be91-9f98c8663f20
+"""
+Creates a new `RetargetingState` object
+"""
+function new_retargeting_state(graph::SimpleDiGraph, attack_nodes::Vector{Int64}, target_nodes::Vector{Int64})
+	@assert length(attack_nodes) == length(target_nodes)
+	n = length(attack_nodes)
+	
+	bitmat = falses(n, n)
+	# bitmat is an n x n bitmatrix that represents if a player can attack 
+    # another player
+	# bitmat[a, t] is true if assassin a can attack target t
+	for a in 1:n
+		for t in 1:n
+			a_node, t_node = attack_nodes[a], target_nodes[t]
+			# A new valid target for an assassin is 
+			# - Not themselves
+			# - Not someone they are targeting / is targeting them
+			bitmat[a, t] = a_node ≠ t_node && a_node ∉ all_neighbors(graph, t_node)
+		end
+	end
+
+    RetargetingState(bitmat, attack_nodes, target_nodes, [])
+end
+
+# ╔═╡ 19fd81cc-ec20-4506-9391-2580afcaffb0
+"""
+Interprets a `RetargetingState` object
+"""
+function interpret_retargeting_state(state::RetargetingState) 
+    todo
+end
+
+# ╔═╡ 1fe0dbc1-1405-49f1-9ec6-ccb64a2657ab
+"""
+Simplifies a `RetargetingState` object
+"""
+function simplify_retargeting_state(state::RetargetingState) 
+    todo
+end
+
+
+# ╔═╡ 641c6778-3db3-4640-8377-3c709f5cab0b
+"""
+Deduces targets internally using `RetargetingState` functions. 
+"""
+function deduce_targets(graph, attack_nodes, target_nodes)
+	state = new_retargeting_state(graph, attack_nodes, target_nodes)
+end
+
+# ╔═╡ c3dff3cf-6c59-436d-8d62-8ec92727145b
+"""
+"""
+function update_kill_increment!(graph, index)
+	BCD = inneighbors(graph, index)
+	EFG = outneighbors(graph, index)
+	deduce_targets(graph, BCD, EFG)
+end
+
 # ╔═╡ e0ff4d0d-7a03-477c-89c1-b32acffe7fce
 function simplify_bitmat(bitmat, attacker_nodes, target_nodes)
 	@assert length(attacker_nodes) == length(target_nodes)
@@ -329,74 +396,14 @@ function simplify_bitmat(bitmat, attacker_nodes, target_nodes)
     Indeterminate(bitmat, attacker_nodes, target_nodes), pairs
 end
 
-# ╔═╡ 641c6778-3db3-4640-8377-3c709f5cab0b
-function deduce_targets(graph, attacker_nodes, target_nodes)
-	@assert length(attacker_nodes) == length(target_nodes)
-	n = length(attacker_nodes)
-	
-	bitmat = falses(n, n)
-	# bitmat is an n x n bitmatrix that represents if a player can attack 
-    # another player
-	# bitmat[a, t] is true if assassin a can attack target t
-	for a in 1:n
-		for t in 1:n
-			a_node, t_node = attacker_nodes[a], target_nodes[t]
-			# A new valid target for an assassin is 
-			# - Not themselves
-			# - Not someone they are targeting / is targeting them
-			bitmat[a, t] = a_node ≠ t_node && a_node ∉ all_neighbors(graph, t_node)
-		end
-	end
-    res, pairs = simplify_bitmat(bitmat, attacker_nodes, target_nodes)
-    res, pairs
-end
-
-# ╔═╡ c3dff3cf-6c59-436d-8d62-8ec92727145b
-"""
-"""
-function update_kill_increment!(graph, index)
-	BCD = inneighbors(graph, index)
-	EFG = outneighbors(graph, index)
-	target_pairs, bitmat = deduce_targets(graph, BCD, EFG)
-end
-
 # ╔═╡ dbd9ddcf-cefe-4f56-adb3-fed3a6671552
-show_graph_around(x, 1)
+show_graph_around(x, 2)
 
 # ╔═╡ 2bb60369-0eef-4488-be37-9ef10e641f0b
 update_kill_increment!(x, 1)
 
 # ╔═╡ 20e87ea1-c996-4110-86ff-63b84fc7747e
 update_kill_increment!(x, 2)
-
-# ╔═╡ f470b6af-640c-4586-a943-caedc1297fec
-update_kill_increment!(x, 3)
-
-# ╔═╡ 38eb5f59-9851-4840-b921-8316f6b83cde
-update_kill_increment!(x, 4)
-
-# ╔═╡ cb0f1e65-3fbc-4d1d-b31f-de546fe3d4da
-update_kill_increment!(x, 5)
-
-# ╔═╡ 60ae5ae1-1215-4ea4-ad3b-0217307f68fd
-begin
-	N_samples = 500
-	N_assasins = 200
-	targets = 3
-
-	G_r = [true_random_graph(N_assasins,targets) for i in 1:N_samples]
-	G_c = [random_on_circular_graph(N_assasins,targets) for i in 1:N_samples]
-end
-
-# ╔═╡ bec684c7-83d2-439e-95f5-665e7221d94a
-begin
-	plot(title="Global Clustering Coefficient")
-	plot!(fit(Normal, global_clustering_coefficient.(G_r)), label="True random")
-	plot!(fit(Normal, global_clustering_coefficient.(G_c)), label="Random on Circular")
-end
-
-# ╔═╡ bf374e51-eb1a-4003-9e08-b5124d013e53
-arr = global_clustering_coefficient.(G_r)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1545,13 +1552,13 @@ version = "0.9.1+5"
 # ╔═╡ Cell order:
 # ╠═cbbb1952-8c58-11ec-2379-69a3044552c9
 # ╟─2559a3eb-0173-43fb-886e-850a6cb385c5
-# ╠═ba97449c-5bb0-45f5-918c-86019db44837
+# ╟─ba97449c-5bb0-45f5-918c-86019db44837
 # ╟─b35d4a16-512e-478d-9b67-ad2172dede06
-# ╠═dda6ac41-3009-41b2-99de-ba1c5b3514c0
+# ╟─dda6ac41-3009-41b2-99de-ba1c5b3514c0
 # ╟─bd4a962f-3888-49fc-ba79-1d8f4e9934d7
-# ╟─ee20e64f-0761-4abc-b02f-f451acea3e83
+# ╠═ee20e64f-0761-4abc-b02f-f451acea3e83
 # ╠═a015e94a-ff27-4454-80ca-ba42e05c1c06
-# ╠═f5e0b873-dfe4-42bf-a0b3-04620530e53a
+# ╟─f5e0b873-dfe4-42bf-a0b3-04620530e53a
 # ╠═78e14371-101e-4d59-ab2e-5d87eba134af
 # ╟─8703e743-a329-4dd7-b944-c4f038b1bd59
 # ╠═c19a3c9e-ef55-413e-b679-2498b5698afb
@@ -1559,20 +1566,18 @@ version = "0.9.1+5"
 # ╠═089fe987-e5ca-4050-9c01-1075ac6aae0f
 # ╠═c5ba70cd-454c-4550-a97a-cd76ceb7fb66
 # ╠═7f5ec11e-28fc-44e7-834a-628390443444
-# ╟─bb82c08a-fab8-455b-ae99-4f5d81e5cb69
+# ╠═bb82c08a-fab8-455b-ae99-4f5d81e5cb69
 # ╟─b1a6f2bb-5b09-4956-8e3a-6d11882179ff
 # ╠═72f41f22-e3a0-4e5b-9751-5f625beb7610
+# ╠═42c0d848-4672-4657-a37c-39e6f4fc03c4
+# ╟─6018d10d-a0ce-460a-be91-9f98c8663f20
+# ╟─19fd81cc-ec20-4506-9391-2580afcaffb0
+# ╟─1fe0dbc1-1405-49f1-9ec6-ccb64a2657ab
 # ╠═c3dff3cf-6c59-436d-8d62-8ec92727145b
-# ╟─641c6778-3db3-4640-8377-3c709f5cab0b
+# ╠═641c6778-3db3-4640-8377-3c709f5cab0b
 # ╟─e0ff4d0d-7a03-477c-89c1-b32acffe7fce
 # ╠═dbd9ddcf-cefe-4f56-adb3-fed3a6671552
 # ╠═2bb60369-0eef-4488-be37-9ef10e641f0b
 # ╠═20e87ea1-c996-4110-86ff-63b84fc7747e
-# ╠═f470b6af-640c-4586-a943-caedc1297fec
-# ╠═38eb5f59-9851-4840-b921-8316f6b83cde
-# ╠═cb0f1e65-3fbc-4d1d-b31f-de546fe3d4da
-# ╠═60ae5ae1-1215-4ea4-ad3b-0217307f68fd
-# ╟─bec684c7-83d2-439e-95f5-665e7221d94a
-# ╠═bf374e51-eb1a-4003-9e08-b5124d013e53
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
