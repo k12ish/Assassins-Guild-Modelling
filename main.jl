@@ -149,18 +149,7 @@ When an assassin dies, we must modify 7 nodes:
 - three nodes that assassin used to attack
 
 
-If we label these nodes with letters from A to F, we can describe this situation succinctly:
-
-```
-    A -> _
-    B -> _
-    C -> _
-    _ -> D
-    _ -> E
-    _ -> F
-```
-
-After a player dies, three assassins are missing a target and three targets are missing an assassin. In the simplest case, there's a total of six possible solutions:
+Three assassins are missing a target and three targets are missing an assassin. In the simplest case, there's a total of six possible solutions:
 
 ```
 Problem:
@@ -185,7 +174,7 @@ Solution #4:        Solution #5:        Solution #6:
     C -> E              C -> D              C -> D  
 ```
 
-Analysis becomes more difficult when there are preexisting relationships between `ABC` and `DEF`.
+Analysis becomes more difficult when there are pre-existing relationships between `ABC` and `DEF`.
 Considering the previous example, suppose that `A` also targets `D`. Now solutions #1 and #4 are invalid, since `A` cannot target `D` twice.
 
 Consider a more complicated problem which we solve in a series of intermediary steps:
@@ -215,24 +204,56 @@ Assassin A targets D:
     _ -> E
     _ -> F
 
+Assassin C targets F:
+
+    A -> D
+    A -> E
+    B -> _
+    B -> F
+    C -> F
+    C -> D
+    _ -> E
+
 Assassin B targets E:
 
     A -> D
     A -> E
     B -> E
     B -> F
-    C -> _
-    C -> D
-    _ -> F
-
-Assassin C targets F:
-
-    A -> D
-    A -> E
-    B -> E
-    B -> F
-    C -> D
     C -> F
+    C -> D
+
+```
+
+This problem can be solved with a matrix:
+
+```
+Problem:
+
+    D E F
+    -----
+ A |0 0 1
+ B |1 1 0
+ C |0 1 1
+
+Assassin A targets F.
+
+    D E F
+    -----
+ A |0 0 0
+ B |1 1 0
+ C |0 1 0
+
+Assassin C targets E.
+
+    D E F
+    -----
+ A |0 0 0
+ B |1 0 0
+ C |0 0 0
+
+Assassin B targets D.
+
 ```
 
 Note that there is only one solution to this problem. If we added more constraints, the problem would become unsolveable.
@@ -247,15 +268,10 @@ In general, there are three types of solutions to these problems:
 """
 
 # ╔═╡ 72f41f22-e3a0-4e5b-9751-5f625beb7610
-begin
-	abstract type GraphResult end
-	struct Determinate <: GraphResult end
-	struct Indeterminate <: GraphResult 
-		inner::BitMatrix
-		attackers::Vector{Int64}
-		targets::Vector{Int64}
-	end
-	struct Unsolveable <: GraphResult end
+@enum GraphResult begin
+    Indeterminate
+	Determinate
+	Unsolveable
 end
 
 # ╔═╡ 42c0d848-4672-4657-a37c-39e6f4fc03c4
@@ -291,22 +307,87 @@ function new_retargeting_state(graph::SimpleDiGraph, attack_nodes::Vector{Int64}
     RetargetingState(bitmat, attack_nodes, target_nodes, [])
 end
 
-# ╔═╡ 19fd81cc-ec20-4506-9391-2580afcaffb0
-"""
-Interprets a `RetargetingState` object
-"""
-function interpret_retargeting_state(state::RetargetingState) 
-    todo
-end
-
 # ╔═╡ 1fe0dbc1-1405-49f1-9ec6-ccb64a2657ab
 """
 Simplifies a `RetargetingState` object
 """
-function simplify_retargeting_state(state::RetargetingState) 
-    todo
-end
+function simplify(state::RetargetingState) 
+    attack_nodes = state.attack_nodes
+    target_nodes = state.target_nodes
+    bitmat       = state.bitmat
 
+	@assert length(attack_nodes) == length(target_nodes)
+	n = length(attack_nodes)
+    pair_indexes = []
+    finished = false
+
+    # Each iteration, we simplify bitmat according to two properties:
+    #
+    #   (1) If assassin a has only one valid target t, then a must target t
+    #   (2) If target t has only one valid assassin a, then a must target t
+    #
+    # Iteration halts when bitmat cannot be simplified down further
+    while !finished
+		finished = true
+		for a in 1:n
+			num_valid_targets = sum(bitmat[a, :])
+			if num_valid_targets == 1
+                # find index of assassin a's only valid target
+				t = findfirst(bitmat[a, :])
+				push!(pair_indexes, (a, t))
+				push!(state.pairs, (attack_nodes[a], target_nodes[t]))
+                # the assassin and the target are no longer valid partners
+                # for other players, so we update the bitmatrix
+				bitmat[a, :] .= false
+				bitmat[:, t] .= false
+				finished = false
+			end
+		end
+		for t in 1:n
+			num_valid_assassins = sum(bitmat[:, t])
+			if num_valid_assassins == 1
+                # find index of target t's only valid asssassin
+				a = findfirst(bitmat[:, t])
+				push!(pair_indexes, (a, t))
+				push!(state.pairs, (attack_nodes[a], target_nodes[t]))
+                # the assassin and the target are no longer valid partners
+                # for other players, so we update the bitmatrix
+				bitmat[a, :] .= false
+				bitmat[:, t] .= false
+				finished = false
+			end
+		end
+    end
+    # Now that we have deduced some (assassin, target) pairings, we resize the
+    # arrays and matrices that make up the `RetargetingState`.
+
+	state.attack_nodes = attack_nodes[setdiff(1:end, [t for (a, t) in pair_indexes])]
+	state.target_nodes = target_nodes[setdiff(1:end, [t for (a, t) in pair_indexes])]
+	state.bitmat = bitmat[
+		setdiff(1:end, [a for (a, t) in pair_indexes]),
+		setdiff(1:end, [t for (a, t) in pair_indexes]),
+	]
+    
+    # All that is left is to categorize the state as `Determinate`, `Indeterminate`
+    # or `Unsolveable`
+
+	if length(state.bitmat) == 0
+        return Determinate, state
+	end
+
+	for row in eachrow(bitmat)
+		if sum(row) == 0
+            return Unsolveable, state
+		end
+	end
+	for col in eachcol(bitmat)
+		if sum(col) == 0
+            return Unsolveable, state
+		end
+	end
+
+    Indeterminate, state
+end
 
 # ╔═╡ 641c6778-3db3-4640-8377-3c709f5cab0b
 """
@@ -314,6 +395,7 @@ Deduces targets internally using `RetargetingState` functions.
 """
 function deduce_targets(graph, attack_nodes, target_nodes)
 	state = new_retargeting_state(graph, attack_nodes, target_nodes)
+	res, state = simplify(state)
 end
 
 # ╔═╡ c3dff3cf-6c59-436d-8d62-8ec92727145b
@@ -325,85 +407,15 @@ function update_kill_increment!(graph, index)
 	deduce_targets(graph, BCD, EFG)
 end
 
-# ╔═╡ e0ff4d0d-7a03-477c-89c1-b32acffe7fce
-function simplify_bitmat(bitmat, attacker_nodes, target_nodes)
-	@assert length(attacker_nodes) == length(target_nodes)
-	n = length(attacker_nodes)
-
-    pair_indexes = []
-    finished = false
-
-    while !finished
-		finished = true
-	    # If assassin a has only one valid target t, then a must target t
-		for a in 1:n
-			num_valid_targets = sum(bitmat[a, :])
-			if num_valid_targets == 1
-                # find index of only valid target
-				t = findfirst(bitmat[a, :])
-				push!(pair_indexes, (a, t))
-                # the assassin and the target are no longer valid partners
-                # for other players, so we update the bitmatrix
-				bitmat[a, :] .= false
-				bitmat[:, t] .= false
-
-				finished = false
-			end
-		end
-	    # If target t has only one valid assassin a, then a must target t
-		for t in 1:n
-			num_valid_assassins = sum(bitmat[:, t])
-			if num_valid_assassins == 1
-                # find index of only valid asssassin
-				a = findfirst(bitmat[:, t])
-				push!(pair_indexes, (a, t))
-                # the assassin and the target are no longer valid partners
-                # for other players, so we update the bitmatrix
-				bitmat[a, :] .= false
-				bitmat[:, t] .= false
-
-				finished = false
-			end
-		end
-    end
-	# remove rows and columns corresponding with assassins and targets that
-	# have been paired up
-	pairs = [(attacker_nodes[a], target_nodes[t]) for (a,t) in pair_indexes]
-	bitmat = bitmat[
-		setdiff(1:end, [a for (a, t) in pair_indexes]),
-		setdiff(1:end, [t for (a, t) in pair_indexes]),
-	]
-	attacker_nodes = attacker_nodes[setdiff(1:end, [t for (a, t) in pair_indexes])]
-	target_nodes = target_nodes[setdiff(1:end, [t for (a, t) in pair_indexes])]
-
-	# if bitmat is empty, then we have deduced all pairings
-	if length(bitmat) == 0
-        return Determinate(), pairs
-	end
-
-    # if any remaining assassin/target has no valid partner, then the targeting
-    # matrix is unsatistfiable
-	for row in eachrow(bitmat)
-		if sum(row) == 0
-            return Unsolveable(), pairs
-		end
-	end
-	for col in eachcol(bitmat)
-		if sum(col) == 0
-            return Unsolveable(), pairs
-		end
-	end
-    Indeterminate(bitmat, attacker_nodes, target_nodes), pairs
-end
 
 # ╔═╡ dbd9ddcf-cefe-4f56-adb3-fed3a6671552
-show_graph_around(x, 2)
+show_graph_around(x, 3)
 
 # ╔═╡ 2bb60369-0eef-4488-be37-9ef10e641f0b
-update_kill_increment!(x, 1)
+update_kill_increment!(x, 2)
 
 # ╔═╡ 20e87ea1-c996-4110-86ff-63b84fc7747e
-update_kill_increment!(x, 2)
+update_kill_increment!(x, 3)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1553,7 +1565,7 @@ version = "0.9.1+5"
 # ╠═cbbb1952-8c58-11ec-2379-69a3044552c9
 # ╟─2559a3eb-0173-43fb-886e-850a6cb385c5
 # ╟─ba97449c-5bb0-45f5-918c-86019db44837
-# ╟─b35d4a16-512e-478d-9b67-ad2172dede06
+# ╠═b35d4a16-512e-478d-9b67-ad2172dede06
 # ╟─dda6ac41-3009-41b2-99de-ba1c5b3514c0
 # ╟─bd4a962f-3888-49fc-ba79-1d8f4e9934d7
 # ╠═ee20e64f-0761-4abc-b02f-f451acea3e83
@@ -1571,11 +1583,9 @@ version = "0.9.1+5"
 # ╠═72f41f22-e3a0-4e5b-9751-5f625beb7610
 # ╠═42c0d848-4672-4657-a37c-39e6f4fc03c4
 # ╟─6018d10d-a0ce-460a-be91-9f98c8663f20
-# ╟─19fd81cc-ec20-4506-9391-2580afcaffb0
 # ╟─1fe0dbc1-1405-49f1-9ec6-ccb64a2657ab
 # ╠═c3dff3cf-6c59-436d-8d62-8ec92727145b
 # ╠═641c6778-3db3-4640-8377-3c709f5cab0b
-# ╟─e0ff4d0d-7a03-477c-89c1-b32acffe7fce
 # ╠═dbd9ddcf-cefe-4f56-adb3-fed3a6671552
 # ╠═2bb60369-0eef-4488-be37-9ef10e641f0b
 # ╠═20e87ea1-c996-4110-86ff-63b84fc7747e
