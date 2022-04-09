@@ -228,49 +228,66 @@ end
 """
 Simplifies a `RetargetingState` object
 """
-function simplify(state::RetargetingState) 
-    attack_nodes = state.attack_nodes
-    target_nodes = state.target_nodes
-    bitmat       = state.bitmat
-
-	@assert length(attack_nodes) == length(target_nodes)
-	n = length(attack_nodes)
+function simplify(s::RetargetingState) 
+	A = length(s.attack_indexes)
+	T = length(s.target_indexes)
     pair_indexes = []
     finished = false
 
     # Each iteration, we simplify bitmat according to two properties:
     #
-    #   (1) If assassin a has only one valid target t, then a must target t
-    #   (2) If target t has only one valid assassin a, then a must target t
+    #   (1) If an assassin requires n targets, and only has n targets to 
+    #       choose from, then that assassin must attack all of the valid 
+    #       targets
+    #
+    #   (2) If a target requires n assassins, and only has n assassins to 
+    #       choose from, then that target must be attacked by all of the
+    #       valid assassins
     #
     # Iteration halts when bitmat cannot be simplified down further
     while !finished
 		finished = true
-		for a in 1:n
-			num_valid_targets = sum(bitmat[a, :])
-			if num_valid_targets == 1
-                # find index of assassin a's only valid target
-				t = findfirst(bitmat[a, :])
-				push!(pair_indexes, (a, t))
-				push!(state.pairs, (attack_nodes[a], target_nodes[t]))
+		for a in 1:A
+            num_required_targets = s.attack_counts[a]
+			num_valid_targets = sum(s.bitmat[a, :])            
+            if num_required_targets > num_valid_targets
+                return Unsolveable
+            elseif num_required_targets == 0
+                continue
+            elseif num_required_targets == num_valid_targets
+                # find index of assassin a's valid targets
+				for t in findall(x -> x, s.bitmat[a, :])
+                    push!(pair_indexes, (a, t))
+                    push!(s.pairs, (s.attack_indexes[a], s.target_indexes[t]))
+                    s.bitmat[:, t] .= false
+                    s.target_counts[t] -= 1
+                end
                 # the assassin and the target are no longer valid partners
                 # for other players, so we update the bitmatrix
-				bitmat[a, :] .= false
-				bitmat[:, t] .= false
+				s.bitmat[a, :] .= false
+                s.attack_counts[a] = 0
 				finished = false
 			end
 		end
-		for t in 1:n
-			num_valid_assassins = sum(bitmat[:, t])
-			if num_valid_assassins == 1
+		for t in 1:T
+            num_required_assassins = s.target_counts[t]
+			num_valid_assassins = sum(s.bitmat[:, t])
+            if num_required_assassins > num_valid_assassins
+                return Unsolveable
+            elseif num_required_assassins == 0
+                continue
+            elseif num_required_assassins == num_valid_assassins
                 # find index of target t's only valid asssassin
-				a = findfirst(bitmat[:, t])
-				push!(pair_indexes, (a, t))
-				push!(state.pairs, (attack_nodes[a], target_nodes[t]))
+				for a in findall(x -> x, s.bitmat[:, t])
+                    push!(pair_indexes, (a, t))
+                    push!(s.pairs, (s.attack_indexes[a], s.target_indexes[t]))
+                    s.bitmat[a, :] .= false
+                    s.attack_counts[a] -= 1
+                end
                 # the assassin and the target are no longer valid partners
                 # for other players, so we update the bitmatrix
-				bitmat[a, :] .= false
-				bitmat[:, t] .= false
+				s.bitmat[:, t] .= false
+                s.target_counts[t] = 0
 				finished = false
 			end
 		end
@@ -278,32 +295,21 @@ function simplify(state::RetargetingState)
     # Now that we have deduced some (assassin, target) pairings, we resize the
     # arrays and matrices that make up the `RetargetingState`.
 
-	state.attack_nodes = attack_nodes[setdiff(1:end, [t for (a, t) in pair_indexes])]
-	state.target_nodes = target_nodes[setdiff(1:end, [t for (a, t) in pair_indexes])]
-	state.bitmat = bitmat[
-		setdiff(1:end, [a for (a, t) in pair_indexes]),
-		setdiff(1:end, [t for (a, t) in pair_indexes]),
-	]
+    valid_attackers = [a for (a, n) in enumerate(s.attack_counts) if n > 0]
+    valid_targets = [t for (t, n) in enumerate(s.target_counts) if n > 0]
+
+	s.attack_indexes = s.attack_indexes[valid_attackers]
+	s.target_indexes = s.target_indexes[valid_targets]
+	s.attack_counts = s.attack_counts[valid_attackers]
+	s.target_counts = s.target_counts[valid_targets]
+	s.bitmat = s.bitmat[valid_attackers, valid_targets]
     
-    # All that is left is to categorize the state as `Determinate`, `Indeterminate`
-    # or `Unsolveable`
-
-	if length(state.bitmat) == 0
-        return Determinate, state
+    # Any `Unsolveable` cases are detected by the main loop, so all that
+    # is left is to categorize the state as `Determinate` or `Indeterminate`
+	if length(s.bitmat) == 0
+        return Determinate
 	end
-
-	for row in eachrow(bitmat)
-		if sum(row) == 0
-            return Unsolveable, state
-		end
-	end
-	for col in eachcol(bitmat)
-		if sum(col) == 0
-            return Unsolveable, state
-		end
-	end
-
-    Indeterminate, state
+    Indeterminate
 end
 
 # ╔═╡ 641c6778-3db3-4640-8377-3c709f5cab0b
@@ -312,11 +318,12 @@ Deduces targets internally using `RetargetingState` functions.
 """
 function deduce_targets(graph, attack_nodes, target_nodes)
 	state = new_retargeting_state(graph, attack_nodes, target_nodes)
-	# res, state = simplify(state)
+	res = simplify(state)
+	state, res
 end
 
 # ╔═╡ dbd9ddcf-cefe-4f56-adb3-fed3a6671552
-show_graph_around(x, 3)
+show_graph_around(x, 4)
 
 # ╔═╡ c3dff3cf-6c59-436d-8d62-8ec92727145b
 """
@@ -329,7 +336,7 @@ end
 
 
 # ╔═╡ 2bb60369-0eef-4488-be37-9ef10e641f0b
-update_kill_increment!(x, 1)
+update_kill_increment!(x, 4)
 
 # ╔═╡ 20e87ea1-c996-4110-86ff-63b84fc7747e
 update_kill_increment!(x, 3)
