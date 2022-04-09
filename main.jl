@@ -12,35 +12,54 @@ function show_graph(g)
 	graphplot(g, curves=false, nodeshape=:circle)
 end
 
-# ╔═╡ b35d4a16-512e-478d-9b67-ad2172dede06
+# ╔═╡ b97a3f6d-77be-4106-a527-dc6e3a0d148f
 """
-Show all nodes that are one degree of separation from a particular node
+Show all nodes that are one degree of separation from certain nodes
 """
-function show_graph_around(g, index)
-    nodes_to_show = vcat([index], all_neighbors(g, index))
-    mapping = Dict(old => new for (new, old) in enumerate(nodes_to_show))
-    new_graph = DiGraph(length(mapping))
+function show_graph_around(g, indexes...)
+    highlighted_nodes = Set(indexes)
+    other_nodes = setdiff(
+        Set(Iterators.flatten(all_neighbors(g, i) for i in indexes)),
+        highlighted_nodes
+    ) 
+    all_nodes = vcat(
+        collect(highlighted_nodes), 
+        collect(other_nodes)
+    )
+
+    # To plot a 'subgraph' of the original graph, we create a new graph and 
+    # populate it with nodes that correspond to nodes in the original graph.
+    mapping = Dict(orig => new for (new, orig) in enumerate(all_nodes))
+    new_graph = DiGraph(length(all_nodes))
 	
     for (old_idx, new_idx) in mapping
         for neigh in outneighbors(g, old_idx)
-            if neigh in nodes_to_show
+            if neigh in all_nodes
                 add_edge!(new_graph, new_idx, mapping[neigh]) 
             end
         end
     end
-	node_weights = vcat([3], fill(1, length(nodes_to_show) - 1))
-	markercolor = vcat([2], fill(1, length(nodes_to_show) - 1))
+	# node_weights = vcat([3], fill(1, length(all_nodes) - 1))
+	node_weights = vcat(
+        fill(3, length(highlighted_nodes)), 
+        fill(1, length(other_nodes))
+    )
+	markercolor = vcat(
+        fill(2, length(highlighted_nodes)), 
+        fill(1, length(other_nodes))
+    )
 	graphplot(
 		new_graph, 
 		method=:circular,
 		nodeshape=:circle,
-		names=nodes_to_show, 
+		names=all_nodes, 
 		node_weights=node_weights,
 		markercolor=markercolor,
 		curves=false,
 		node_size=0.2
 	)
 end
+
 
 # ╔═╡ bd4a962f-3888-49fc-ba79-1d8f4e9934d7
 """
@@ -104,7 +123,7 @@ md"""
 """
 
 # ╔═╡ c19a3c9e-ef55-413e-b679-2498b5698afb
-n = 11
+n = 20
 
 # ╔═╡ 881a8105-b801-4794-b683-ace203b5d90a
 SKILL_DISTRIBUTION = Pareto(1.7, 0.001)
@@ -119,7 +138,7 @@ end
 x = random_on_circular_graph(n, 2)
 
 # ╔═╡ dda6ac41-3009-41b2-99de-ba1c5b3514c0
-show_graph_around(x, 2)
+show_graph_around(x, 2, 11)
 
 # ╔═╡ 7f5ec11e-28fc-44e7-834a-628390443444
 graphplot(x, node_weights=player_skills, names = 1:n, curves=false)
@@ -322,24 +341,38 @@ function deduce_targets(graph, attack_nodes, target_nodes)
 	state, res
 end
 
-# ╔═╡ dbd9ddcf-cefe-4f56-adb3-fed3a6671552
-show_graph_around(x, 4)
-
 # ╔═╡ c3dff3cf-6c59-436d-8d62-8ec92727145b
 """
 """
-function update_kill_increment!(graph, index)
-	attackers = inneighbors(graph, index) |> countmap
-	targets = outneighbors(graph, index) |> countmap
+function kill!(graph, indexes...)
+	attackers = Dict{Int64,UInt8}()
+	targets = Dict{Int64,UInt8}()
+    for index in indexes
+        addcounts!(attackers, inneighbors(graph, index))
+        addcounts!(targets, outneighbors(graph, index))
+    end
+    for index in indexes
+        delete!(attackers, index)
+        delete!(targets, index)
+    end
 	deduce_targets(graph, attackers, targets)
 end
 
 
-# ╔═╡ 2bb60369-0eef-4488-be37-9ef10e641f0b
-update_kill_increment!(x, 4)
+# ╔═╡ dbd9ddcf-cefe-4f56-adb3-fed3a6671552
+show_graph_around(x, 2, 11, 6)
 
 # ╔═╡ 20e87ea1-c996-4110-86ff-63b84fc7747e
-update_kill_increment!(x, 3)
+kill!(x, 2, 11, 6)
+
+# ╔═╡ e0c105c9-1da8-48d5-ab59-5cf864583180
+show_graph_around(x, 2)
+
+# ╔═╡ f3a107af-94e8-4fe0-b20f-2275e8cb553b
+kill!(x, 2)
+
+# ╔═╡ 2bb60369-0eef-4488-be37-9ef10e641f0b
+kill!(x, 11)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1488,8 +1521,8 @@ version = "0.9.1+5"
 # ╔═╡ Cell order:
 # ╠═cbbb1952-8c58-11ec-2379-69a3044552c9
 # ╠═ba97449c-5bb0-45f5-918c-86019db44837
-# ╟─b35d4a16-512e-478d-9b67-ad2172dede06
-# ╟─dda6ac41-3009-41b2-99de-ba1c5b3514c0
+# ╟─b97a3f6d-77be-4106-a527-dc6e3a0d148f
+# ╠═dda6ac41-3009-41b2-99de-ba1c5b3514c0
 # ╟─bd4a962f-3888-49fc-ba79-1d8f4e9934d7
 # ╠═ee20e64f-0761-4abc-b02f-f451acea3e83
 # ╠═a015e94a-ff27-4454-80ca-ba42e05c1c06
@@ -1508,9 +1541,11 @@ version = "0.9.1+5"
 # ╟─6018d10d-a0ce-460a-be91-9f98c8663f20
 # ╟─1fe0dbc1-1405-49f1-9ec6-ccb64a2657ab
 # ╠═641c6778-3db3-4640-8377-3c709f5cab0b
-# ╠═dbd9ddcf-cefe-4f56-adb3-fed3a6671552
-# ╠═2bb60369-0eef-4488-be37-9ef10e641f0b
-# ╠═20e87ea1-c996-4110-86ff-63b84fc7747e
 # ╠═c3dff3cf-6c59-436d-8d62-8ec92727145b
+# ╠═dbd9ddcf-cefe-4f56-adb3-fed3a6671552
+# ╠═20e87ea1-c996-4110-86ff-63b84fc7747e
+# ╠═e0c105c9-1da8-48d5-ab59-5cf864583180
+# ╠═f3a107af-94e8-4fe0-b20f-2275e8cb553b
+# ╠═2bb60369-0eef-4488-be37-9ef10e641f0b
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
