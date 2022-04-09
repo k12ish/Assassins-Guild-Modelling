@@ -7,17 +7,6 @@ using InteractiveUtils
 # ╔═╡ cbbb1952-8c58-11ec-2379-69a3044552c9
 using Graphs, Plots, GraphRecipes, StatsBase, StatsPlots, Distributions
 
-# ╔═╡ 2559a3eb-0173-43fb-886e-850a6cb385c5
-md"""
-# Creating the Graph
-
-Invariants:
-- Every assassin targets three unique assassins
-- Every assassin is targeted by 3 unique assassins
-- An assassin cannot target themselves
-
-"""
-
 # ╔═╡ ba97449c-5bb0-45f5-918c-86019db44837
 function show_graph(g)
 	graphplot(g, curves=false, nodeshape=:circle)
@@ -138,127 +127,8 @@ graphplot(x, node_weights=player_skills, names = 1:n, curves=false)
 # ╔═╡ bb82c08a-fab8-455b-ae99-4f5d81e5cb69
 dists = floyd_warshall_shortest_paths(x).dists
 
-# ╔═╡ b1a6f2bb-5b09-4956-8e3a-6d11882179ff
+# ╔═╡ 5c2e85ff-95da-49c2-898a-64b4da72173e
 md"""
-# Simulating the game
-
-When an assassin dies, we must modify 7 nodes:
-
-- one node for the dead assassin
-- three nodes that attack the assassin
-- three nodes that assassin used to attack
-
-
-Three assassins are missing a target and three targets are missing an assassin. In the simplest case, there's a total of six possible solutions:
-
-```
-Problem:
-
-    A -> _
-    B -> _
-    C -> _
-    _ -> D
-    _ -> E
-    _ -> F
-
-------------------------------------------------------
-
-Solution #1:        Solution #2:        Solution #3:
-    A -> D              A -> E              A -> F  
-    B -> E              B -> D              B -> D  
-    C -> F              C -> F              C -> E  
-            
-Solution #4:        Solution #5:        Solution #6:
-    A -> D              A -> E              A -> F  
-    B -> F              B -> F              B -> E  
-    C -> E              C -> D              C -> D  
-```
-
-Analysis becomes more difficult when there are pre-existing relationships between `ABC` and `DEF`.
-Considering the previous example, suppose that `A` also targets `D`. Now solutions #1 and #4 are invalid, since `A` cannot target `D` twice.
-
-Consider a more complicated problem which we solve in a series of intermediary steps:
-```
-Problem:
-
-    A -> _
-    A -> E
-    B -> _
-    B -> F
-    C -> _
-    C -> D
-    _ -> D
-    _ -> E
-    _ -> F
-
-------------------------------------------------------
-
-Assassin A targets D:
-
-    A -> D
-    A -> E
-    B -> _
-    B -> F
-    C -> _
-    C -> D
-    _ -> E
-    _ -> F
-
-Assassin C targets F:
-
-    A -> D
-    A -> E
-    B -> _
-    B -> F
-    C -> F
-    C -> D
-    _ -> E
-
-Assassin B targets E:
-
-    A -> D
-    A -> E
-    B -> E
-    B -> F
-    C -> F
-    C -> D
-
-```
-
-This problem can be solved with a matrix:
-
-```
-Problem:
-
-    D E F
-    -----
- A |0 0 1
- B |1 1 0
- C |0 1 1
-
-Assassin A targets F.
-
-    D E F
-    -----
- A |0 0 0
- B |1 1 0
- C |0 1 0
-
-Assassin C targets E.
-
-    D E F
-    -----
- A |0 0 0
- B |1 0 0
- C |0 0 0
-
-Assassin B targets D.
-
-```
-
-Note that there is only one solution to this problem. If we added more constraints, the problem would become unsolveable.
-
-In general, there are three types of solutions to these problems:
 
 1) Many combinations of targeting pairs are valid (`Indeterminate`)
 2) One combination of targeting pairs is valid (`Determinate`)
@@ -1610,8 +1480,7 @@ version = "0.9.1+5"
 
 # ╔═╡ Cell order:
 # ╠═cbbb1952-8c58-11ec-2379-69a3044552c9
-# ╟─2559a3eb-0173-43fb-886e-850a6cb385c5
-# ╟─ba97449c-5bb0-45f5-918c-86019db44837
+# ╠═ba97449c-5bb0-45f5-918c-86019db44837
 # ╟─b35d4a16-512e-478d-9b67-ad2172dede06
 # ╟─dda6ac41-3009-41b2-99de-ba1c5b3514c0
 # ╟─bd4a962f-3888-49fc-ba79-1d8f4e9934d7
@@ -1626,10 +1495,10 @@ version = "0.9.1+5"
 # ╠═c5ba70cd-454c-4550-a97a-cd76ceb7fb66
 # ╠═7f5ec11e-28fc-44e7-834a-628390443444
 # ╠═bb82c08a-fab8-455b-ae99-4f5d81e5cb69
-# ╟─b1a6f2bb-5b09-4956-8e3a-6d11882179ff
+# ╟─5c2e85ff-95da-49c2-898a-64b4da72173e
 # ╠═72f41f22-e3a0-4e5b-9751-5f625beb7610
 # ╟─42c0d848-4672-4657-a37c-39e6f4fc03c4
-# ╠═6018d10d-a0ce-460a-be91-9f98c8663f20
+# ╟─6018d10d-a0ce-460a-be91-9f98c8663f20
 # ╟─1fe0dbc1-1405-49f1-9ec6-ccb64a2657ab
 # ╠═641c6778-3db3-4640-8377-3c709f5cab0b
 # ╠═dbd9ddcf-cefe-4f56-adb3-fed3a6671552
