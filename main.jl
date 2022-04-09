@@ -9,7 +9,7 @@ using Graphs, Plots, GraphRecipes, StatsBase, StatsPlots, Distributions
 
 # ╔═╡ ba97449c-5bb0-45f5-918c-86019db44837
 function show_graph(g)
-	graphplot(g, curves=false, nodeshape=:circle)
+    graphplot(g, curves = false, nodeshape = :circle)
 end
 
 # ╔═╡ b97a3f6d-77be-4106-a527-dc6e3a0d148f
@@ -20,44 +20,35 @@ function show_graph_around(g, indexes...)
     highlighted_nodes = Set(indexes)
     other_nodes = setdiff(
         Set(Iterators.flatten(all_neighbors(g, i) for i in indexes)),
-        highlighted_nodes
-    ) 
-    all_nodes = vcat(
-        collect(highlighted_nodes), 
-        collect(other_nodes)
+        highlighted_nodes,
     )
+    all_nodes = vcat(collect(highlighted_nodes), collect(other_nodes))
 
     # To plot a 'subgraph' of the original graph, we create a new graph and 
     # populate it with nodes that correspond to nodes in the original graph.
     mapping = Dict(orig => new for (new, orig) in enumerate(all_nodes))
     new_graph = DiGraph(length(all_nodes))
-	
+
     for (old_idx, new_idx) in mapping
         for neigh in outneighbors(g, old_idx)
             if neigh in all_nodes
-                add_edge!(new_graph, new_idx, mapping[neigh]) 
+                add_edge!(new_graph, new_idx, mapping[neigh])
             end
         end
     end
-	# node_weights = vcat([3], fill(1, length(all_nodes) - 1))
-	node_weights = vcat(
-        fill(3, length(highlighted_nodes)), 
-        fill(1, length(other_nodes))
+    # node_weights = vcat([3], fill(1, length(all_nodes) - 1))
+    node_weights = vcat(fill(3, length(highlighted_nodes)), fill(1, length(other_nodes)))
+    markercolor = vcat(fill(2, length(highlighted_nodes)), fill(1, length(other_nodes)))
+    graphplot(
+        new_graph,
+        method = :circular,
+        nodeshape = :circle,
+        names = all_nodes,
+        node_weights = node_weights,
+        markercolor = markercolor,
+        curves = false,
+        node_size = 0.2,
     )
-	markercolor = vcat(
-        fill(2, length(highlighted_nodes)), 
-        fill(1, length(other_nodes))
-    )
-	graphplot(
-		new_graph, 
-		method=:circular,
-		nodeshape=:circle,
-		names=all_nodes, 
-		node_weights=node_weights,
-		markercolor=markercolor,
-		curves=false,
-		node_size=0.2
-	)
 end
 
 
@@ -67,51 +58,51 @@ fill input graph so that each node has a certain number of outneighbours and inn
 
 Since this function is random, it is not guarenteed to produce a valid result; it will return false if the input graph cannot be fully filled.
 """
-function fill_true_random!(graph, N, num_targets=3)
-	for i in 1:N
-		targets_to_add = num_targets - length(outneighbors(graph, i))
-		potential_targets = collect(j for j in vertices(graph) if 
-			i ≠ j 
-			&& !has_edge(graph, j, i)
-			&& !has_edge(graph, i, j)
-			&& length(inneighbors(graph, j)) < num_targets
-		)
-		if length(potential_targets) < targets_to_add
-			return false
-		end
-		selected_targets = sample(potential_targets, targets_to_add; replace=false)
-		for j in selected_targets
-			add_edge!(graph, i, j)
-		end
-	end
-	true
+function fill_true_random!(graph, N, num_targets = 3)
+    for i = 1:N
+        targets_to_add = num_targets - length(outneighbors(graph, i))
+        potential_targets = collect(
+            j for j in vertices(graph) if i ≠ j &&
+            !has_edge(graph, j, i) &&
+            !has_edge(graph, i, j) &&
+            length(inneighbors(graph, j)) < num_targets
+        )
+        if length(potential_targets) < targets_to_add
+            return false
+        end
+        selected_targets = sample(potential_targets, targets_to_add; replace = false)
+        for j in selected_targets
+            add_edge!(graph, i, j)
+        end
+    end
+    true
 end
 
 # ╔═╡ ee20e64f-0761-4abc-b02f-f451acea3e83
-function true_random_graph(N, targets=3)
-	for i in 1:1000
-		graph = SimpleDiGraph(N)
-		success = fill_true_random!(graph, N, targets)
-		if success
-			return graph
-		end
-	end
-	Exception()
+function true_random_graph(N, targets = 3)
+    for i = 1:1000
+        graph = SimpleDiGraph(N)
+        success = fill_true_random!(graph, N, targets)
+        if success
+            return graph
+        end
+    end
+    Exception()
 end
 
 # ╔═╡ a015e94a-ff27-4454-80ca-ba42e05c1c06
 show_graph(true_random_graph(10, 2))
 
 # ╔═╡ f5e0b873-dfe4-42bf-a0b3-04620530e53a
-function random_on_circular_graph(N, targets=3)
-	for i in 1:1000
-		graph = cycle_digraph(N)
-		success = fill_true_random!(graph, N, targets)
-		if success
-			return graph
-		end
-	end
-	Exception()
+function random_on_circular_graph(N, targets = 3)
+    for i = 1:1000
+        graph = cycle_digraph(N)
+        success = fill_true_random!(graph, N, targets)
+        if success
+            return graph
+        end
+    end
+    Exception()
 end
 
 # ╔═╡ 78e14371-101e-4d59-ab2e-5d87eba134af
@@ -123,15 +114,15 @@ md"""
 """
 
 # ╔═╡ c19a3c9e-ef55-413e-b679-2498b5698afb
-n = 20
+n = 18
 
 # ╔═╡ 881a8105-b801-4794-b683-ace203b5d90a
 SKILL_DISTRIBUTION = Pareto(1.7, 0.001)
 
 # ╔═╡ 089fe987-e5ca-4050-9c01-1075ac6aae0f
 begin
-	player_skills = rand(SKILL_DISTRIBUTION, n)
-	maximum(player_skills) / minimum(player_skills)
+    player_skills = rand(SKILL_DISTRIBUTION, n)
+    maximum(player_skills) / minimum(player_skills)
 end
 
 # ╔═╡ c5ba70cd-454c-4550-a97a-cd76ceb7fb66
@@ -141,7 +132,7 @@ x = random_on_circular_graph(n, 2)
 show_graph_around(x, 2, 11)
 
 # ╔═╡ 7f5ec11e-28fc-44e7-834a-628390443444
-graphplot(x, node_weights=player_skills, names = 1:n, curves=false)
+graphplot(x, node_weights = player_skills, names = 1:n, curves = false)
 
 # ╔═╡ bb82c08a-fab8-455b-ae99-4f5d81e5cb69
 dists = floyd_warshall_shortest_paths(x).dists
@@ -159,8 +150,8 @@ md"""
 # ╔═╡ 72f41f22-e3a0-4e5b-9751-5f625beb7610
 @enum GraphResult begin
     Indeterminate
-	Determinate
-	Unsolveable
+    Determinate
+    Unsolveable
 end
 
 # ╔═╡ 42c0d848-4672-4657-a37c-39e6f4fc03c4
@@ -194,12 +185,12 @@ To avoid costly operations on a large graph, `RetargetingState` replicates a sma
 
 """
 mutable struct RetargetingState
-	bitmat::BitMatrix
-	attack_indexes::Vector{Int64}
-	target_indexes::Vector{Int64}
-	attack_counts::Vector{UInt8}
-	target_counts::Vector{UInt8}
-    pairs::Vector{Tuple{Int64, Int64}}
+    bitmat::BitMatrix
+    attack_indexes::Vector{Int64}
+    target_indexes::Vector{Int64}
+    attack_counts::Vector{UInt8}
+    target_counts::Vector{UInt8}
+    pairs::Vector{Tuple{Int64,Int64}}
 end
 
 # ╔═╡ 6018d10d-a0ce-460a-be91-9f98c8663f20
@@ -217,39 +208,44 @@ function new_retargeting_state(graph::SimpleDiGraph, attack_nodes, target_nodes)
         push!(attack_indexes, index)
         push!(attack_counts, count)
     end
-    
+
     for (index, count) in target_nodes
         push!(target_indexes, index)
         push!(target_counts, count)
     end
-    
-	A = length(attack_indexes)
-	T = length(target_indexes)
-	
-	bitmat = falses(A, T)
-	# bitmat[a, t] is true if assassin a can attack target t
-	for a in 1:A
-		for t in 1:T
-			a_node, t_node = attack_indexes[a], target_indexes[t]
-			# A new valid target for an assassin is 
-			# - Not themselves
-			# - Not someone they are targeting / is targeting them
-			bitmat[a, t] = a_node ≠ t_node && a_node ∉ all_neighbors(graph, t_node)
-		end
-	end
 
-    RetargetingState(bitmat, 
-        attack_indexes, target_indexes, attack_counts, target_counts,
-     [])
+    A = length(attack_indexes)
+    T = length(target_indexes)
+
+    bitmat = falses(A, T)
+    # bitmat[a, t] is true if assassin a can attack target t
+    for a = 1:A
+        for t = 1:T
+            a_node, t_node = attack_indexes[a], target_indexes[t]
+            # A new valid target for an assassin is 
+            # - Not themselves
+            # - Not someone they are targeting / is targeting them
+            bitmat[a, t] = a_node ≠ t_node && a_node ∉ all_neighbors(graph, t_node)
+        end
+    end
+
+    RetargetingState(
+        bitmat,
+        attack_indexes,
+        target_indexes,
+        attack_counts,
+        target_counts,
+        [],
+    )
 end
 
 # ╔═╡ 1fe0dbc1-1405-49f1-9ec6-ccb64a2657ab
 """
 Simplifies a `RetargetingState` object
 """
-function simplify(s::RetargetingState) 
-	A = length(s.attack_indexes)
-	T = length(s.target_indexes)
+function simplify(s::RetargetingState)
+    A = length(s.attack_indexes)
+    T = length(s.target_indexes)
     pair_indexes = []
     finished = false
 
@@ -265,17 +261,17 @@ function simplify(s::RetargetingState)
     #
     # Iteration halts when bitmat cannot be simplified down further
     while !finished
-		finished = true
-		for a in 1:A
+        finished = true
+        for a = 1:A
             num_required_targets = s.attack_counts[a]
-			num_valid_targets = sum(s.bitmat[a, :])            
+            num_valid_targets = sum(s.bitmat[a, :])
             if num_required_targets > num_valid_targets
                 return Unsolveable
             elseif num_required_targets == 0
                 continue
             elseif num_required_targets == num_valid_targets
                 # find index of assassin a's valid targets
-				for t in findall(x -> x, s.bitmat[a, :])
+                for t in findall(x -> x, s.bitmat[a, :])
                     push!(pair_indexes, (a, t))
                     push!(s.pairs, (s.attack_indexes[a], s.target_indexes[t]))
                     s.bitmat[:, t] .= false
@@ -283,21 +279,21 @@ function simplify(s::RetargetingState)
                 end
                 # the assassin and the target are no longer valid partners
                 # for other players, so we update the bitmatrix
-				s.bitmat[a, :] .= false
+                s.bitmat[a, :] .= false
                 s.attack_counts[a] = 0
-				finished = false
-			end
-		end
-		for t in 1:T
+                finished = false
+            end
+        end
+        for t = 1:T
             num_required_assassins = s.target_counts[t]
-			num_valid_assassins = sum(s.bitmat[:, t])
+            num_valid_assassins = sum(s.bitmat[:, t])
             if num_required_assassins > num_valid_assassins
                 return Unsolveable
             elseif num_required_assassins == 0
                 continue
             elseif num_required_assassins == num_valid_assassins
                 # find index of target t's only valid asssassin
-				for a in findall(x -> x, s.bitmat[:, t])
+                for a in findall(x -> x, s.bitmat[:, t])
                     push!(pair_indexes, (a, t))
                     push!(s.pairs, (s.attack_indexes[a], s.target_indexes[t]))
                     s.bitmat[a, :] .= false
@@ -305,11 +301,11 @@ function simplify(s::RetargetingState)
                 end
                 # the assassin and the target are no longer valid partners
                 # for other players, so we update the bitmatrix
-				s.bitmat[:, t] .= false
+                s.bitmat[:, t] .= false
                 s.target_counts[t] = 0
-				finished = false
-			end
-		end
+                finished = false
+            end
+        end
     end
     # Now that we have deduced some (assassin, target) pairings, we resize the
     # arrays and matrices that make up the `RetargetingState`.
@@ -317,17 +313,17 @@ function simplify(s::RetargetingState)
     valid_attackers = [a for (a, n) in enumerate(s.attack_counts) if n > 0]
     valid_targets = [t for (t, n) in enumerate(s.target_counts) if n > 0]
 
-	s.attack_indexes = s.attack_indexes[valid_attackers]
-	s.target_indexes = s.target_indexes[valid_targets]
-	s.attack_counts = s.attack_counts[valid_attackers]
-	s.target_counts = s.target_counts[valid_targets]
-	s.bitmat = s.bitmat[valid_attackers, valid_targets]
-    
+    s.attack_indexes = s.attack_indexes[valid_attackers]
+    s.target_indexes = s.target_indexes[valid_targets]
+    s.attack_counts = s.attack_counts[valid_attackers]
+    s.target_counts = s.target_counts[valid_targets]
+    s.bitmat = s.bitmat[valid_attackers, valid_targets]
+
     # Any `Unsolveable` cases are detected by the main loop, so all that
     # is left is to categorize the state as `Determinate` or `Indeterminate`
-	if length(s.bitmat) == 0
+    if length(s.bitmat) == 0
         return Determinate
-	end
+    end
     Indeterminate
 end
 
@@ -336,17 +332,17 @@ end
 Deduces targets internally using `RetargetingState` functions. 
 """
 function deduce_targets(graph, attack_nodes, target_nodes)
-	state = new_retargeting_state(graph, attack_nodes, target_nodes)
-	res = simplify(state)
-	state, res
+    state = new_retargeting_state(graph, attack_nodes, target_nodes)
+    res = simplify(state)
+    state, res
 end
 
 # ╔═╡ c3dff3cf-6c59-436d-8d62-8ec92727145b
 """
 """
 function kill!(graph, indexes...)
-	attackers = Dict{Int64,UInt8}()
-	targets = Dict{Int64,UInt8}()
+    attackers = Dict{Int64,UInt8}()
+    targets = Dict{Int64,UInt8}()
     for index in indexes
         addcounts!(attackers, inneighbors(graph, index))
         addcounts!(targets, outneighbors(graph, index))
@@ -355,15 +351,15 @@ function kill!(graph, indexes...)
         delete!(attackers, index)
         delete!(targets, index)
     end
-	deduce_targets(graph, attackers, targets)
+    deduce_targets(graph, attackers, targets)
 end
 
 
 # ╔═╡ dbd9ddcf-cefe-4f56-adb3-fed3a6671552
-show_graph_around(x, 2, 11, 6)
+show_graph_around(x, 3, 11)
 
 # ╔═╡ 20e87ea1-c996-4110-86ff-63b84fc7747e
-kill!(x, 2, 11, 6)
+kill!(x, 13, 8)
 
 # ╔═╡ e0c105c9-1da8-48d5-ab59-5cf864583180
 show_graph_around(x, 2)
