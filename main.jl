@@ -80,7 +80,7 @@ end
 
 # ╔═╡ ee20e64f-0761-4abc-b02f-f451acea3e83
 function true_random_graph(N, targets = 3)
-    for i = 1:1000
+    for i = 1:100
         graph = SimpleDiGraph(N)
         success = fill_true_random!(graph, N, targets)
         if success
@@ -95,7 +95,7 @@ show_graph(true_random_graph(10, 2))
 
 # ╔═╡ f5e0b873-dfe4-42bf-a0b3-04620530e53a
 function random_on_circular_graph(N, targets = 3)
-    for i = 1:1000
+    for i = 1:100
         graph = cycle_digraph(N)
         success = fill_true_random!(graph, N, targets)
         if success
@@ -126,13 +126,10 @@ begin
 end
 
 # ╔═╡ c5ba70cd-454c-4550-a97a-cd76ceb7fb66
-x = random_on_circular_graph(n, 2)
+x = random_on_circular_graph(n, 3)
 
 # ╔═╡ dda6ac41-3009-41b2-99de-ba1c5b3514c0
 show_graph_around(x, 2, 11)
-
-# ╔═╡ 7f5ec11e-28fc-44e7-834a-628390443444
-graphplot(x, node_weights = player_skills, names = 1:n, curves = false)
 
 # ╔═╡ bb82c08a-fab8-455b-ae99-4f5d81e5cb69
 dists = floyd_warshall_shortest_paths(x).dists
@@ -362,13 +359,58 @@ show_graph_around(x, 3, 11)
 kill!(x, 13, 8)
 
 # ╔═╡ e0c105c9-1da8-48d5-ab59-5cf864583180
-show_graph_around(x, 2)
+show_graph_around(x, 5)
 
 # ╔═╡ f3a107af-94e8-4fe0-b20f-2275e8cb553b
-kill!(x, 2)
+rs, _ = kill!(x, 5)
+
+# ╔═╡ d4ef25b1-c330-4a3f-ae35-33eb3f00dff7
+rs
+
+# ╔═╡ 9b9de9e5-fc42-45a0-8310-49fb692146b3
+show_graph_around(x, 11, 8)
 
 # ╔═╡ 2bb60369-0eef-4488-be37-9ef10e641f0b
-kill!(x, 11)
+kill!(x, 11, 8)
+
+# ╔═╡ f252c051-7917-4cef-8678-aa299718c302
+data = rand(10, 3)
+
+# ╔═╡ 1a99c3fd-5ba0-4458-abcf-7549b709290b
+begin
+	@userplot RetargetResultPlot
+	@recipe function f(a::RetargetResultPlot)
+		seriestype --> :line
+		palette    --> :Dark2_5
+		fillalpha  --> 0.5
+		xflip      --> true
+		xlabel     --> "Number of Players"
+		yticks     --> (0:20:100, ["$x%" for x in 0:20:100])
+	
+		data = cumsum(a.args[end], dims=2)
+		data = data ./ data[:, end] .* 100
+		x = length(a.args) == 1 ? (axes(data, 1)) : a.args[1]
+	
+		@series begin
+			label     := "Indeterminate"
+			fillrange := 0
+			x, data[:,1]
+		end
+		@series begin
+			label     := "Determinate"
+			fillrange := data[:,1]
+			x, data[:,2]
+		end
+		@series begin
+			label     := "Unsolveable"
+			fillrange := data[:,2]
+			x, data[:,3]
+		end
+	end
+end
+
+# ╔═╡ add0beac-23aa-4fea-9f14-1f8e9578acdc
+retargetresultplot(data)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1529,7 +1571,6 @@ version = "0.9.1+5"
 # ╠═881a8105-b801-4794-b683-ace203b5d90a
 # ╠═089fe987-e5ca-4050-9c01-1075ac6aae0f
 # ╠═c5ba70cd-454c-4550-a97a-cd76ceb7fb66
-# ╠═7f5ec11e-28fc-44e7-834a-628390443444
 # ╠═bb82c08a-fab8-455b-ae99-4f5d81e5cb69
 # ╟─5c2e85ff-95da-49c2-898a-64b4da72173e
 # ╠═72f41f22-e3a0-4e5b-9751-5f625beb7610
@@ -1542,6 +1583,11 @@ version = "0.9.1+5"
 # ╠═20e87ea1-c996-4110-86ff-63b84fc7747e
 # ╠═e0c105c9-1da8-48d5-ab59-5cf864583180
 # ╠═f3a107af-94e8-4fe0-b20f-2275e8cb553b
+# ╠═d4ef25b1-c330-4a3f-ae35-33eb3f00dff7
+# ╠═9b9de9e5-fc42-45a0-8310-49fb692146b3
 # ╠═2bb60369-0eef-4488-be37-9ef10e641f0b
+# ╠═f252c051-7917-4cef-8678-aa299718c302
+# ╠═1a99c3fd-5ba0-4458-abcf-7549b709290b
+# ╠═add0beac-23aa-4fea-9f14-1f8e9578acdc
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
