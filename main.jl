@@ -16,10 +16,10 @@ end
 """
 Show all nodes that are one degree of separation from certain nodes
 """
-function show_graph_around(g, indexes...)
-    highlighted_nodes = Set(indexes)
+function show_graph_around(g, nodes...)
+    highlighted_nodes = Set(nodes)
     other_nodes = setdiff(
-        Set(Iterators.flatten(all_neighbors(g, i) for i in indexes)),
+        Set(Iterators.flatten(all_neighbors(g, i) for i in nodes)),
         highlighted_nodes,
     )
     all_nodes = vcat(collect(highlighted_nodes), collect(other_nodes))
@@ -164,7 +164,7 @@ To avoid costly operations on a large graph, `RetargetingState` replicates a sma
     - any number of `(a, t)` tuples that occur in `pairs` is added to it
     - any one relationship `(a, t)` is added such that `bitmat[a][t] == true`
 
-2) `length(attack_indexes) == length(attack_counts)` and likewise for targets.
+2) `length(attack_indices) == length(attack_counts)` and likewise for targets.
 
 3) `sum(attack_counts) == sum(target_counts)`
 
@@ -173,8 +173,8 @@ To avoid costly operations on a large graph, `RetargetingState` replicates a sma
 - `bitmat`
     - `bitmat[a][t] == true` if `(a, t)` is a valid relationship in the graph
 
-- `attack_indexes` and `target_indexes`
-    - `attack_indexes[a]` returns the index of assassin `a` in the graph
+- `attack_indices` and `target_indices`
+    - `attack_indices[a]` returns the index of assassin `a` in the graph
 
 - `attack_counts` and `target_counts`
     - `attacker_counts[a]` represents the number of targets assassin `a` requires
@@ -183,8 +183,8 @@ To avoid costly operations on a large graph, `RetargetingState` replicates a sma
 """
 mutable struct RetargetingState
     bitmat::BitMatrix
-    attack_indexes::Vector{Int64}
-    target_indexes::Vector{Int64}
+    attack_indices::Vector{Int64}
+    target_indices::Vector{Int64}
     attack_counts::Vector{UInt8}
     target_counts::Vector{UInt8}
     pairs::Vector{Tuple{Int64,Int64}}
@@ -196,29 +196,29 @@ Creates a new `RetargetingState` object
 """
 function new_retargeting_state(graph::SimpleDiGraph, attack_nodes, target_nodes)
 
-    attack_indexes = Vector{Int64}()
-    target_indexes = Vector{Int64}()
+    attack_indices = Vector{Int64}()
+    target_indices = Vector{Int64}()
     attack_counts = Vector{UInt8}()
     target_counts = Vector{UInt8}()
 
     for (index, count) in attack_nodes
-        push!(attack_indexes, index)
+        push!(attack_indices, index)
         push!(attack_counts, count)
     end
 
     for (index, count) in target_nodes
-        push!(target_indexes, index)
+        push!(target_indices, index)
         push!(target_counts, count)
     end
 
-    A = length(attack_indexes)
-    T = length(target_indexes)
+    A = length(attack_indices)
+    T = length(target_indices)
 
     bitmat = falses(A, T)
     # bitmat[a, t] is true if assassin a can attack target t
     for a = 1:A
         for t = 1:T
-            a_node, t_node = attack_indexes[a], target_indexes[t]
+            a_node, t_node = attack_indices[a], target_indices[t]
             # A new valid target for an assassin is 
             # - Not themselves
             # - Not someone they are targeting / is targeting them
@@ -228,12 +228,27 @@ function new_retargeting_state(graph::SimpleDiGraph, attack_nodes, target_nodes)
 
     RetargetingState(
         bitmat,
-        attack_indexes,
-        target_indexes,
+        attack_indices,
+        target_indices,
         attack_counts,
         target_counts,
         [],
     )
+end
+
+# ╔═╡ 028ac6ec-b4ed-4ba7-8f4c-df23bac20b52
+"""
+Resizes the underlying matrix and vectors that make up a `RetargetingState`
+"""
+function shrink!(s::RetargetingState)
+    valid_attackers = [a for (a, n) in enumerate(s.attack_counts) if n > 0]
+    valid_targets = [t for (t, n) in enumerate(s.target_counts) if n > 0]
+
+    s.attack_indices = s.attack_indices[valid_attackers]
+    s.target_indices = s.target_indices[valid_targets]
+    s.attack_counts = s.attack_counts[valid_attackers]
+    s.target_counts = s.target_counts[valid_targets]
+    s.bitmat = s.bitmat[valid_attackers, valid_targets]
 end
 
 # ╔═╡ 1fe0dbc1-1405-49f1-9ec6-ccb64a2657ab
@@ -241,9 +256,9 @@ end
 Simplifies a `RetargetingState` object
 """
 function simplify(s::RetargetingState)
-    A = length(s.attack_indexes)
-    T = length(s.target_indexes)
-    pair_indexes = []
+    A = length(s.attack_indices)
+    T = length(s.target_indices)
+    pair_indices = []
     finished = false
 
     # Each iteration, we simplify bitmat according to two properties:
@@ -269,8 +284,8 @@ function simplify(s::RetargetingState)
             elseif num_required_targets == num_valid_targets
                 # find index of assassin a's valid targets
                 for t in findall(x -> x, s.bitmat[a, :])
-                    push!(pair_indexes, (a, t))
-                    push!(s.pairs, (s.attack_indexes[a], s.target_indexes[t]))
+                    push!(pair_indices, (a, t))
+                    push!(s.pairs, (s.attack_indices[a], s.target_indices[t]))
                     s.bitmat[:, t] .= false
                     s.target_counts[t] -= 1
                 end
@@ -291,8 +306,8 @@ function simplify(s::RetargetingState)
             elseif num_required_assassins == num_valid_assassins
                 # find index of target t's only valid asssassin
                 for a in findall(x -> x, s.bitmat[:, t])
-                    push!(pair_indexes, (a, t))
-                    push!(s.pairs, (s.attack_indexes[a], s.target_indexes[t]))
+                    push!(pair_indices, (a, t))
+                    push!(s.pairs, (s.attack_indices[a], s.target_indices[t]))
                     s.bitmat[a, :] .= false
                     s.attack_counts[a] -= 1
                 end
@@ -306,16 +321,7 @@ function simplify(s::RetargetingState)
     end
     # Now that we have deduced some (assassin, target) pairings, we resize the
     # arrays and matrices that make up the `RetargetingState`.
-
-    valid_attackers = [a for (a, n) in enumerate(s.attack_counts) if n > 0]
-    valid_targets = [t for (t, n) in enumerate(s.target_counts) if n > 0]
-
-    s.attack_indexes = s.attack_indexes[valid_attackers]
-    s.target_indexes = s.target_indexes[valid_targets]
-    s.attack_counts = s.attack_counts[valid_attackers]
-    s.target_counts = s.target_counts[valid_targets]
-    s.bitmat = s.bitmat[valid_attackers, valid_targets]
-
+    shrink!(s)
     # Any `Unsolveable` cases are detected by the main loop, so all that
     # is left is to categorize the state as `Determinate` or `Indeterminate`
     if length(s.bitmat) == 0
@@ -334,51 +340,75 @@ function deduce_targets(graph, attack_nodes, target_nodes)
     state, res
 end
 
-# ╔═╡ c3dff3cf-6c59-436d-8d62-8ec92727145b
+# ╔═╡ ab590764-a9df-42ee-b73f-7594d0a6cc0b
 """
+Mock kill indices in graph, returning the deduced targeting scheme
 """
-function kill!(graph, indexes...)
+function soft_kill!(graph, tiebreak!, dead...)
+    # dict mapping each node to the number of occurrences
     attackers = Dict{Int64,UInt8}()
     targets = Dict{Int64,UInt8}()
-    for index in indexes
+    for index in dead
+        # updates counts in dictionary with neighbours of index
         addcounts!(attackers, inneighbors(graph, index))
         addcounts!(targets, outneighbors(graph, index))
     end
-    for index in indexes
+    # Edge case: if a pair of dead nodes target each other, then
+    # the targeting algorithm would try to retarget a dead node
+    # To prevent this, we remove indices of dead nodes
+    for index in dead
         delete!(attackers, index)
         delete!(targets, index)
     end
-    deduce_targets(graph, attackers, targets)
+    state, res = deduce_targets(graph, attackers, targets)
+    res = tiebreak!(state)
+    state
+end
+
+
+# ╔═╡ c3dff3cf-6c59-436d-8d62-8ec92727145b
+"""
+"""
+function kill!(graph, tiebreak, dead...)
+    soft_kill!(graph, tiebreak, dead...)
 end
 
 
 # ╔═╡ dbd9ddcf-cefe-4f56-adb3-fed3a6671552
 show_graph_around(x, 3, 11)
 
-# ╔═╡ 20e87ea1-c996-4110-86ff-63b84fc7747e
-kill!(x, 13, 8)
-
-# ╔═╡ e0c105c9-1da8-48d5-ab59-5cf864583180
-show_graph_around(x, 5)
-
-# ╔═╡ f3a107af-94e8-4fe0-b20f-2275e8cb553b
-rs, _ = kill!(x, 5)
-
-# ╔═╡ d4ef25b1-c330-4a3f-ae35-33eb3f00dff7
-rs
-
-# ╔═╡ 9b9de9e5-fc42-45a0-8310-49fb692146b3
-show_graph_around(x, 11, 8)
-
-# ╔═╡ 2bb60369-0eef-4488-be37-9ef10e641f0b
-kill!(x, 11, 8)
-
 # ╔═╡ f252c051-7917-4cef-8678-aa299718c302
 data = rand(10, 3)
+
+# ╔═╡ db4a61a7-3b63-4609-9ca2-08cc400bf2f2
+function tiebreak_random!(s::RetargetingState)
+    A = length(s.attack_indices)
+    T = length(s.target_indices)
+    a, t = 0, 0
+    while true
+        a = rand(1:A)
+        t = rand(1:T)
+        s.bitmat[a, t] || break
+    end
+    push!(s.pairs, (s.attack_indices[a], s.target_indices[t]))
+    s.attack_counts[a] -= 1
+    s.target_counts[t] -= 1
+    if s.attack_counts[a] == 0
+        s.bitmat[a, :] .= false
+    end
+    if s.target_counts[t] == 0
+        s.bitmat[:, t] .= false
+    end
+    simplify(s)
+end
+
+# ╔═╡ 20e87ea1-c996-4110-86ff-63b84fc7747e
+rs, _ = soft_kill!(x, tiebreak_random!, 11, 3)
 
 # ╔═╡ 1a99c3fd-5ba0-4458-abcf-7549b709290b
 begin
 	@userplot RetargetResultPlot
+	"""**`RetargetResultPlot`**"""
 	@recipe function f(a::RetargetResultPlot)
 		seriestype --> :line
 		palette    --> :Dark2_5
@@ -1577,17 +1607,15 @@ version = "0.9.1+5"
 # ╟─42c0d848-4672-4657-a37c-39e6f4fc03c4
 # ╟─6018d10d-a0ce-460a-be91-9f98c8663f20
 # ╟─1fe0dbc1-1405-49f1-9ec6-ccb64a2657ab
+# ╠═028ac6ec-b4ed-4ba7-8f4c-df23bac20b52
 # ╠═641c6778-3db3-4640-8377-3c709f5cab0b
-# ╠═c3dff3cf-6c59-436d-8d62-8ec92727145b
+# ╟─ab590764-a9df-42ee-b73f-7594d0a6cc0b
+# ╟─c3dff3cf-6c59-436d-8d62-8ec92727145b
 # ╠═dbd9ddcf-cefe-4f56-adb3-fed3a6671552
 # ╠═20e87ea1-c996-4110-86ff-63b84fc7747e
-# ╠═e0c105c9-1da8-48d5-ab59-5cf864583180
-# ╠═f3a107af-94e8-4fe0-b20f-2275e8cb553b
-# ╠═d4ef25b1-c330-4a3f-ae35-33eb3f00dff7
-# ╠═9b9de9e5-fc42-45a0-8310-49fb692146b3
-# ╠═2bb60369-0eef-4488-be37-9ef10e641f0b
 # ╠═f252c051-7917-4cef-8678-aa299718c302
-# ╠═1a99c3fd-5ba0-4458-abcf-7549b709290b
+# ╠═db4a61a7-3b63-4609-9ca2-08cc400bf2f2
+# ╟─1a99c3fd-5ba0-4458-abcf-7549b709290b
 # ╠═add0beac-23aa-4fea-9f14-1f8e9578acdc
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
