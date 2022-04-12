@@ -5,7 +5,7 @@ using Markdown
 using InteractiveUtils
 
 # ╔═╡ cbbb1952-8c58-11ec-2379-69a3044552c9
-using Graphs, Plots, GraphRecipes, StatsBase, StatsPlots, Distributions
+using Graphs, Plots, GraphRecipes, StatsBase, StatsPlots, Distributions, Random
 
 # ╔═╡ ba97449c-5bb0-45f5-918c-86019db44837
 function show_graph(g)
@@ -438,8 +438,7 @@ begin
 		seriestype --> :line
 		palette    --> :Dark2_5
 		fillalpha  --> 0.5
-		xflip      --> true
-		xlabel     --> "Number of Players"
+		xlabel     --> "Fatalities"
 		yticks     --> (0:20:100, ["$x%" for x in 0:20:100])
 	
 		data = cumsum(a.args[end], dims=2)
@@ -464,8 +463,40 @@ begin
 	end
 end
 
+# ╔═╡ a3028938-6ca3-4f7f-ad08-f8b5d9c03470
+function test_retargeting(graph_builder, tiebreaker, N::Integer)
+    results = zeros(typeof(N), nv(graph_builder()), 3)
+    for _ in 1:N
+		graph = graph_builder()
+        kill_list = shuffle(1:nv(graph))
+
+        while length(kill_list) > 0
+            fatalities = [pop!(kill_list)]
+            state = kill!(graph, fatalities...; tb! = tiebreaker)
+            x = length(kill_list) + length(fatalities)
+            if state.solution_type == Indeterminate
+                results[x, 1] += 1
+            elseif state.solution_type == Determinate
+                results[x, 2] += 1
+            else
+                results[x, 3] += 1
+                break
+            end
+		end
+
+    end
+    retargetresultplot(results)
+end
+
+# ╔═╡ 3015ef04-4775-45de-9778-c5d346ae23ca
+test_retargeting(
+	() -> true_random_graph(50),
+	tiebreak_random!,
+	2000
+)
+
 # ╔═╡ f252c051-7917-4cef-8678-aa299718c302
-data = rand(10, 3)
+data = rand(10, 3) * 10
 
 # ╔═╡ add0beac-23aa-4fea-9f14-1f8e9578acdc
 retargetresultplot(data)
@@ -477,6 +508,7 @@ Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 GraphRecipes = "bd48cda9-67a9-57be-86fa-5b3c104eda73"
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 
@@ -1644,7 +1676,9 @@ version = "0.9.1+5"
 # ╠═1706468a-79dd-4402-8b3d-d17eed3e0131
 # ╠═20e87ea1-c996-4110-86ff-63b84fc7747e
 # ╟─db4a61a7-3b63-4609-9ca2-08cc400bf2f2
-# ╟─1a99c3fd-5ba0-4458-abcf-7549b709290b
+# ╠═1a99c3fd-5ba0-4458-abcf-7549b709290b
+# ╠═a3028938-6ca3-4f7f-ad08-f8b5d9c03470
+# ╠═3015ef04-4775-45de-9778-c5d346ae23ca
 # ╠═f252c051-7917-4cef-8678-aa299718c302
 # ╠═add0beac-23aa-4fea-9f14-1f8e9578acdc
 # ╟─00000000-0000-0000-0000-000000000001
