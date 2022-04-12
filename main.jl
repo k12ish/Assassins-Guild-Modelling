@@ -145,7 +145,8 @@ md"""
 """
 
 # ╔═╡ 72f41f22-e3a0-4e5b-9751-5f625beb7610
-@enum GraphResult begin
+@enum SolutionType begin
+    Unknown
     Indeterminate
     Determinate
     Unsolveable
@@ -183,6 +184,7 @@ To avoid costly operations on a large graph, `RetargetingState` replicates a sma
 """
 mutable struct RetargetingState
     bitmat::BitMatrix
+    solution_type::SolutionType
     attack_indices::Vector{Int64}
     target_indices::Vector{Int64}
     attack_counts::Vector{UInt8}
@@ -228,6 +230,7 @@ function new_retargeting_state(graph::SimpleDiGraph, attack_nodes, target_nodes)
 
     RetargetingState(
         bitmat,
+        Unknown,
         attack_indices,
         target_indices,
         attack_counts,
@@ -334,17 +337,7 @@ end
 """
 Deduces targets internally using `RetargetingState` functions. 
 """
-function deduce_targets(graph, attack_nodes, target_nodes)
-    state = new_retargeting_state(graph, attack_nodes, target_nodes)
-    res = simplify(state)
-    state, res
-end
-
-# ╔═╡ ab590764-a9df-42ee-b73f-7594d0a6cc0b
-"""
-Mock kill indices in graph, returning the deduced targeting scheme
-"""
-function soft_kill!(graph, tiebreak!, dead...)
+function deduce_state(graph, dead...)
     # dict mapping each node to the number of occurrences
     attackers = Dict{Int64,UInt8}()
     targets = Dict{Int64,UInt8}()
@@ -360,25 +353,17 @@ function soft_kill!(graph, tiebreak!, dead...)
         delete!(attackers, index)
         delete!(targets, index)
     end
-    state, res = deduce_targets(graph, attackers, targets)
-    res = tiebreak!(state)
-    state
+    state = new_retargeting_state(graph, attackers, targets)
+    res = simplify(state)
+    state.solution_type = res
+    state, res
 end
 
-
-# ╔═╡ c3dff3cf-6c59-436d-8d62-8ec92727145b
-"""
-"""
-function kill!(graph, tiebreak, dead...)
-    soft_kill!(graph, tiebreak, dead...)
-end
-
+# ╔═╡ 6a72f0b7-87aa-4d9a-a2e4-81de20171c28
+pts = [1]
 
 # ╔═╡ dbd9ddcf-cefe-4f56-adb3-fed3a6671552
-show_graph_around(x, 3, 11)
-
-# ╔═╡ f252c051-7917-4cef-8678-aa299718c302
-data = rand(10, 3)
+show_graph_around(x, 10)
 
 # ╔═╡ db4a61a7-3b63-4609-9ca2-08cc400bf2f2
 function tiebreak_random!(s::RetargetingState)
@@ -388,7 +373,7 @@ function tiebreak_random!(s::RetargetingState)
     while true
         a = rand(1:A)
         t = rand(1:T)
-        s.bitmat[a, t] || break
+        s.bitmat[a, t] && break
     end
     push!(s.pairs, (s.attack_indices[a], s.target_indices[t]))
     s.attack_counts[a] -= 1
@@ -402,8 +387,48 @@ function tiebreak_random!(s::RetargetingState)
     simplify(s)
 end
 
+# ╔═╡ ab590764-a9df-42ee-b73f-7594d0a6cc0b
+"""
+Mock kill indices in graph, returning the deduced targeting scheme
+"""
+function soft_kill!(graph, dead...; tb! = tiebreak_random!)
+    state, res = deduce_state(graph, dead...)
+    while res == Indeterminate
+        res = tb!(state)
+    end
+    state
+end
+
+
 # ╔═╡ 20e87ea1-c996-4110-86ff-63b84fc7747e
-rs, _ = soft_kill!(x, tiebreak_random!, 11, 3)
+soft_kill!(x, pts...).pairs
+
+# ╔═╡ c3dff3cf-6c59-436d-8d62-8ec92727145b
+"""
+"""
+function kill!(graph, dead...; tb! = tiebreak_random!)
+    state = soft_kill!(graph, dead..., tb! = tb!)
+    for d in dead
+        for a in inneighbors(graph, d)
+            rem_edge!(graph, a, d)
+        end
+        for t in outneighbors(graph, d)
+            rem_edge!(graph, d, t)
+        end
+    end
+    for (a, t) in state.pairs
+        add_edge!(graph, a, t)
+    end
+    state
+end
+
+
+# ╔═╡ 1706468a-79dd-4402-8b3d-d17eed3e0131
+begin
+	y = copy(x)
+	kill!(y, pts...)
+	show_graph_around(y, 10)
+end
 
 # ╔═╡ 1a99c3fd-5ba0-4458-abcf-7549b709290b
 begin
@@ -438,6 +463,9 @@ begin
 		end
 	end
 end
+
+# ╔═╡ f252c051-7917-4cef-8678-aa299718c302
+data = rand(10, 3)
 
 # ╔═╡ add0beac-23aa-4fea-9f14-1f8e9578acdc
 retargetresultplot(data)
@@ -1608,14 +1636,16 @@ version = "0.9.1+5"
 # ╟─6018d10d-a0ce-460a-be91-9f98c8663f20
 # ╟─1fe0dbc1-1405-49f1-9ec6-ccb64a2657ab
 # ╠═028ac6ec-b4ed-4ba7-8f4c-df23bac20b52
-# ╠═641c6778-3db3-4640-8377-3c709f5cab0b
+# ╟─641c6778-3db3-4640-8377-3c709f5cab0b
 # ╟─ab590764-a9df-42ee-b73f-7594d0a6cc0b
-# ╟─c3dff3cf-6c59-436d-8d62-8ec92727145b
+# ╠═c3dff3cf-6c59-436d-8d62-8ec92727145b
+# ╠═6a72f0b7-87aa-4d9a-a2e4-81de20171c28
 # ╠═dbd9ddcf-cefe-4f56-adb3-fed3a6671552
+# ╠═1706468a-79dd-4402-8b3d-d17eed3e0131
 # ╠═20e87ea1-c996-4110-86ff-63b84fc7747e
-# ╠═f252c051-7917-4cef-8678-aa299718c302
-# ╠═db4a61a7-3b63-4609-9ca2-08cc400bf2f2
+# ╟─db4a61a7-3b63-4609-9ca2-08cc400bf2f2
 # ╟─1a99c3fd-5ba0-4458-abcf-7549b709290b
+# ╠═f252c051-7917-4cef-8678-aa299718c302
 # ╠═add0beac-23aa-4fea-9f14-1f8e9578acdc
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
