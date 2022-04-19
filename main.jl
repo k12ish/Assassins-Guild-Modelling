@@ -108,6 +108,18 @@ end
 # ╔═╡ 78e14371-101e-4d59-ab2e-5d87eba134af
 show_graph(random_on_circular_graph(10, 2))
 
+# ╔═╡ 84fb21d1-124c-4574-8dbd-c71b43edefd7
+function check_graph_validity(g)
+	for n in 1:nv(g)
+		out_n = length(outneighbors(g, n))
+		in_n =  length(inneighbors(g, n))
+		if out_n ∉ [0, 3] || in_n ∉ [0, 3]
+			return false
+		end
+	end
+	return true
+end
+
 # ╔═╡ 8703e743-a329-4dd7-b944-c4f038b1bd59
 md"""
 # Assigning the Players
@@ -130,6 +142,9 @@ x = random_on_circular_graph(n, 3)
 
 # ╔═╡ dda6ac41-3009-41b2-99de-ba1c5b3514c0
 show_graph_around(x, 2, 11)
+
+# ╔═╡ 6164010c-2bab-4c20-86e9-bfe19ad33b4f
+check_graph_validity(x)
 
 # ╔═╡ bb82c08a-fab8-455b-ae99-4f5d81e5cb69
 dists = floyd_warshall_shortest_paths(x).dists
@@ -359,11 +374,8 @@ function deduce_state(graph, dead...)
     state, res
 end
 
-# ╔═╡ 6a72f0b7-87aa-4d9a-a2e4-81de20171c28
-pts = [1]
-
 # ╔═╡ dbd9ddcf-cefe-4f56-adb3-fed3a6671552
-show_graph_around(x, 10)
+show_graph_around(x, 1)
 
 # ╔═╡ db4a61a7-3b63-4609-9ca2-08cc400bf2f2
 function tiebreak_random!(s::RetargetingState)
@@ -400,21 +412,19 @@ function soft_kill!(graph, dead...; tb! = tiebreak_random!)
 end
 
 
-# ╔═╡ 20e87ea1-c996-4110-86ff-63b84fc7747e
-soft_kill!(x, pts...).pairs
-
 # ╔═╡ c3dff3cf-6c59-436d-8d62-8ec92727145b
 """
+Kill indices in graph, returning the corresponding `RetargetingState`
 """
 function kill!(graph, dead...; tb! = tiebreak_random!)
     state = soft_kill!(graph, dead..., tb! = tb!)
-    for d in dead
-        for a in inneighbors(graph, d)
-            rem_edge!(graph, a, d)
+	for d in dead
+		for a in copy(inneighbors(graph, d))
+            @assert rem_edge!(graph, a, d)
         end
-        for t in outneighbors(graph, d)
-            rem_edge!(graph, d, t)
-        end
+        for t in copy(outneighbors(graph, d))
+            @assert rem_edge!(graph, d, t)
+		end
     end
     for (a, t) in state.pairs
         add_edge!(graph, a, t)
@@ -422,24 +432,17 @@ function kill!(graph, dead...; tb! = tiebreak_random!)
     state
 end
 
-
-# ╔═╡ 1706468a-79dd-4402-8b3d-d17eed3e0131
-begin
-	y = copy(x)
-	kill!(y, pts...)
-	show_graph_around(y, 10)
-end
-
 # ╔═╡ 1a99c3fd-5ba0-4458-abcf-7549b709290b
 begin
 	@userplot RetargetResultPlot
-	"""**`RetargetResultPlot`**"""
 	@recipe function f(a::RetargetResultPlot)
 		seriestype --> :line
 		palette    --> :Dark2_5
 		fillalpha  --> 0.5
-		xlabel     --> "Fatalities"
+		xlabel     --> "Population"
+		xflip      --> true
 		yticks     --> (0:20:100, ["$x%" for x in 0:20:100])
+		legend     --> :bottomleft
 	
 		data = cumsum(a.args[end], dims=2)
 		data = data ./ data[:, end] .* 100
@@ -471,15 +474,15 @@ function test_retargeting(graph_builder, tiebreaker, N::Integer)
         kill_list = shuffle(1:nv(graph))
 
         while length(kill_list) > 0
-            fatalities = [pop!(kill_list)]
-            state = kill!(graph, fatalities...; tb! = tiebreaker)
-            x = length(kill_list) + length(fatalities)
+            pop = length(kill_list)
+            fatality = pop!(kill_list)
+            state = kill!(graph, fatality; tb! = tiebreaker)
             if state.solution_type == Indeterminate
-                results[x, 1] += 1
+                results[pop, 1] += 1
             elseif state.solution_type == Determinate
-                results[x, 2] += 1
+                results[pop, 2] += 1
             else
-                results[x, 3] += 1
+                results[begin:pop, 3] .+= 1
                 break
             end
 		end
@@ -490,16 +493,17 @@ end
 
 # ╔═╡ 3015ef04-4775-45de-9778-c5d346ae23ca
 test_retargeting(
-	() -> true_random_graph(50),
+	() -> true_random_graph(100),
 	tiebreak_random!,
 	2000
 )
 
-# ╔═╡ f252c051-7917-4cef-8678-aa299718c302
-data = rand(10, 3) * 10
-
-# ╔═╡ add0beac-23aa-4fea-9f14-1f8e9578acdc
-retargetresultplot(data)
+# ╔═╡ 2e6bdf9c-9b4e-48c7-a9fd-a4517c1b08ac
+test_retargeting(
+	() -> random_on_circular_graph(100),
+	tiebreak_random!,
+	2000
+)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1656,6 +1660,8 @@ version = "0.9.1+5"
 # ╠═a015e94a-ff27-4454-80ca-ba42e05c1c06
 # ╟─f5e0b873-dfe4-42bf-a0b3-04620530e53a
 # ╠═78e14371-101e-4d59-ab2e-5d87eba134af
+# ╠═84fb21d1-124c-4574-8dbd-c71b43edefd7
+# ╠═6164010c-2bab-4c20-86e9-bfe19ad33b4f
 # ╟─8703e743-a329-4dd7-b944-c4f038b1bd59
 # ╠═c19a3c9e-ef55-413e-b679-2498b5698afb
 # ╠═881a8105-b801-4794-b683-ace203b5d90a
@@ -1670,16 +1676,12 @@ version = "0.9.1+5"
 # ╠═028ac6ec-b4ed-4ba7-8f4c-df23bac20b52
 # ╟─641c6778-3db3-4640-8377-3c709f5cab0b
 # ╟─ab590764-a9df-42ee-b73f-7594d0a6cc0b
-# ╠═c3dff3cf-6c59-436d-8d62-8ec92727145b
-# ╠═6a72f0b7-87aa-4d9a-a2e4-81de20171c28
+# ╟─c3dff3cf-6c59-436d-8d62-8ec92727145b
 # ╠═dbd9ddcf-cefe-4f56-adb3-fed3a6671552
-# ╠═1706468a-79dd-4402-8b3d-d17eed3e0131
-# ╠═20e87ea1-c996-4110-86ff-63b84fc7747e
 # ╟─db4a61a7-3b63-4609-9ca2-08cc400bf2f2
 # ╠═1a99c3fd-5ba0-4458-abcf-7549b709290b
 # ╠═a3028938-6ca3-4f7f-ad08-f8b5d9c03470
 # ╠═3015ef04-4775-45de-9778-c5d346ae23ca
-# ╠═f252c051-7917-4cef-8678-aa299718c302
-# ╠═add0beac-23aa-4fea-9f14-1f8e9578acdc
+# ╠═2e6bdf9c-9b4e-48c7-a9fd-a4517c1b08ac
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
