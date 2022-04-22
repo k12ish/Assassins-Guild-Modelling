@@ -7,6 +7,23 @@ using InteractiveUtils
 # ╔═╡ cbbb1952-8c58-11ec-2379-69a3044552c9
 using Graphs, Plots, GraphRecipes, StatsBase, StatsPlots, Distributions, Random
 
+# ╔═╡ f2d3d6e6-26fd-418d-9715-8136c7eaa119
+mutable struct Population
+	graph::SimpleDiGraph{Int64}
+	player_skills::Vector{Float64}
+end
+
+# ╔═╡ e191d6d3-61f6-412e-ae51-d6b7fee5c250
+function new_game(new_graph, P, skill_distributor)
+	graph = new_graph(200)
+	player_skills = skill_distributor(graph)
+
+    graph_func = last(split(repr(new_graph), '.'))
+    skill_func = last(split(repr(skill_distributor), '.'))
+
+    "P=$(P) with $(graph_func) $(skill_func)"
+end
+
 # ╔═╡ ba97449c-5bb0-45f5-918c-86019db44837
 function show_graph(g)
     graphplot(g, curves = false, nodeshape = :circle)
@@ -58,8 +75,8 @@ fill input graph so that each node has a certain number of outneighbours and inn
 
 Since this function is random, it is not guarenteed to produce a valid result; it will return false if the input graph cannot be fully filled.
 """
-function fill_true_random!(graph, N, num_targets = 3)
-    for i = 1:N
+function fill_true_random!(graph, P, num_targets = 3)
+    for i = 1:P
         targets_to_add = num_targets - length(outneighbors(graph, i))
         potential_targets = collect(
             j for j in vertices(graph) if i ≠ j &&
@@ -79,10 +96,10 @@ function fill_true_random!(graph, N, num_targets = 3)
 end
 
 # ╔═╡ ee20e64f-0761-4abc-b02f-f451acea3e83
-function true_random_graph(N, targets = 3)
+function true_random_graph(P, targets = 3)
     for i = 1:100
-        graph = SimpleDiGraph(N)
-        success = fill_true_random!(graph, N, targets)
+        graph = SimpleDiGraph(P)
+        success = fill_true_random!(graph, P, targets)
         if success
             return graph
         end
@@ -94,16 +111,19 @@ end
 show_graph(true_random_graph(10, 2))
 
 # ╔═╡ f5e0b873-dfe4-42bf-a0b3-04620530e53a
-function random_on_circular_graph(N, targets = 3)
+function random_on_circular_graph(P, targets = 3)
     for i = 1:100
-        graph = cycle_digraph(N)
-        success = fill_true_random!(graph, N, targets)
+        graph = cycle_digraph(P)
+        success = fill_true_random!(graph, P, targets)
         if success
             return graph
         end
     end
     Exception()
 end
+
+# ╔═╡ d771486b-92f6-4bf6-9a41-aa84d342bf40
+new_game(random_on_circular_graph, 100, nv)
 
 # ╔═╡ 78e14371-101e-4d59-ab2e-5d87eba134af
 show_graph(random_on_circular_graph(10, 2))
@@ -1214,9 +1234,9 @@ uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
 [[Qt5Base_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Fontconfig_jll", "Glib_jll", "JLLWrappers", "Libdl", "Libglvnd_jll", "OpenSSL_jll", "Pkg", "Xorg_libXext_jll", "Xorg_libxcb_jll", "Xorg_xcb_util_image_jll", "Xorg_xcb_util_keysyms_jll", "Xorg_xcb_util_renderutil_jll", "Xorg_xcb_util_wm_jll", "Zlib_jll", "xkbcommon_jll"]
-git-tree-sha1 = "ad368663a5e20dbb8d6dc2fddeefe4dae0781ae8"
+git-tree-sha1 = "c6c0f690d0cc7caddb74cef7aa847b824a16b256"
 uuid = "ea2cea3b-5b76-57ae-a6ef-0a8af62496e1"
-version = "5.15.3+0"
+version = "5.15.3+1"
 
 [[QuadGK]]
 deps = ["DataStructures", "LinearAlgebra"]
@@ -1652,6 +1672,9 @@ version = "0.9.1+5"
 
 # ╔═╡ Cell order:
 # ╠═cbbb1952-8c58-11ec-2379-69a3044552c9
+# ╠═f2d3d6e6-26fd-418d-9715-8136c7eaa119
+# ╠═e191d6d3-61f6-412e-ae51-d6b7fee5c250
+# ╠═d771486b-92f6-4bf6-9a41-aa84d342bf40
 # ╠═ba97449c-5bb0-45f5-918c-86019db44837
 # ╟─b97a3f6d-77be-4106-a527-dc6e3a0d148f
 # ╠═dda6ac41-3009-41b2-99de-ba1c5b3514c0
@@ -1670,7 +1693,7 @@ version = "0.9.1+5"
 # ╠═bb82c08a-fab8-455b-ae99-4f5d81e5cb69
 # ╟─5c2e85ff-95da-49c2-898a-64b4da72173e
 # ╠═72f41f22-e3a0-4e5b-9751-5f625beb7610
-# ╟─42c0d848-4672-4657-a37c-39e6f4fc03c4
+# ╠═42c0d848-4672-4657-a37c-39e6f4fc03c4
 # ╟─6018d10d-a0ce-460a-be91-9f98c8663f20
 # ╟─1fe0dbc1-1405-49f1-9ec6-ccb64a2657ab
 # ╠═028ac6ec-b4ed-4ba7-8f4c-df23bac20b52
@@ -1679,7 +1702,7 @@ version = "0.9.1+5"
 # ╟─c3dff3cf-6c59-436d-8d62-8ec92727145b
 # ╠═dbd9ddcf-cefe-4f56-adb3-fed3a6671552
 # ╟─db4a61a7-3b63-4609-9ca2-08cc400bf2f2
-# ╠═1a99c3fd-5ba0-4458-abcf-7549b709290b
+# ╟─1a99c3fd-5ba0-4458-abcf-7549b709290b
 # ╠═a3028938-6ca3-4f7f-ad08-f8b5d9c03470
 # ╠═3015ef04-4775-45de-9778-c5d346ae23ca
 # ╠═2e6bdf9c-9b4e-48c7-a9fd-a4517c1b08ac
