@@ -395,7 +395,7 @@ function deduce_state(graph, dead...)
 end
 
 # ╔═╡ dbd9ddcf-cefe-4f56-adb3-fed3a6671552
-show_graph_around(x, 1)
+show_graph_around(x, 1, 5)
 
 # ╔═╡ db4a61a7-3b63-4609-9ca2-08cc400bf2f2
 function tiebreak_random!(s::RetargetingState)
@@ -437,7 +437,8 @@ end
 Kill indices in graph, returning the corresponding `RetargetingState`
 """
 function kill!(graph, dead...; tb! = tiebreak_random!)
-    state = soft_kill!(graph, dead..., tb! = tb!)
+    @assert check_graph_validity(graph)
+	state = soft_kill!(graph, dead..., tb! = tb!)
 	for d in dead
 		for a in copy(inneighbors(graph, d))
             @assert rem_edge!(graph, a, d)
@@ -463,7 +464,7 @@ begin
 		xflip      --> true
 		yticks     --> (0:20:100, ["$x%" for x in 0:20:100])
 		legend     --> :bottomleft
-	
+
 		data = cumsum(a.args[end], dims=2)
 		data = data ./ data[:, end] .* 100
 		x = length(a.args) == 1 ? (axes(data, 1)) : a.args[1]
@@ -494,35 +495,63 @@ function test_retargeting(graph_builder, tiebreaker, N::Integer)
         kill_list = shuffle(1:nv(graph))
 
         while length(kill_list) > 0
-            pop = length(kill_list)
+            p = length(kill_list)
             fatality = pop!(kill_list)
             state = kill!(graph, fatality; tb! = tiebreaker)
             if state.solution_type == Indeterminate
-                results[pop, 1] += 1
+                results[p, 1] += 1
             elseif state.solution_type == Determinate
-                results[pop, 2] += 1
+                results[p, 2] += 1
             else
-                results[begin:pop, 3] .+= 1
+                results[begin:p, 3] .+= 1
                 break
             end
 		end
 
     end
-    retargetresultplot(results)
+    retargetresultplot(results, title="Individual Retargeting")
+end
+
+# ╔═╡ 5539709d-99c4-47e9-a5dc-3284637bbfdf
+function test_retargeting_batch(graph_builder, tiebreaker, N::Integer)
+    results = zeros(typeof(N), nv(graph_builder()), 3)
+    for _ in 1:N
+		graph = graph_builder()
+        kill_list = shuffle(1:nv(graph))
+
+        while length(kill_list) > 0
+            p_init = length(kill_list)
+            dead = [pop!(kill_list), pop!(kill_list)]
+            p_final = length(kill_list)
+            state = kill!(graph, dead...; tb! = tiebreaker)
+            if state.solution_type == Indeterminate
+                results[p_final + 1:p_init, 1] .+= 1
+            elseif state.solution_type == Determinate
+                results[p_final + 1:p_init, 2] .+= 1
+			elseif state.solution_type == Unknown
+				@error "Unexpected solution type"
+            else
+                results[begin:p_init, 3] .+= 1
+                break
+            end
+		end
+
+    end
+    retargetresultplot(results, title="Batch Retargeting")
 end
 
 # ╔═╡ 3015ef04-4775-45de-9778-c5d346ae23ca
 test_retargeting(
 	() -> true_random_graph(100),
 	tiebreak_random!,
-	2000
+	10_000
 )
 
-# ╔═╡ 2e6bdf9c-9b4e-48c7-a9fd-a4517c1b08ac
-test_retargeting(
-	() -> random_on_circular_graph(100),
+# ╔═╡ be782bbd-2f04-4e34-a0d9-8ac391159b04
+test_retargeting_batch(
+	() -> true_random_graph(100),
 	tiebreak_random!,
-	2000
+	10_000
 )
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1693,18 +1722,19 @@ version = "0.9.1+5"
 # ╠═bb82c08a-fab8-455b-ae99-4f5d81e5cb69
 # ╟─5c2e85ff-95da-49c2-898a-64b4da72173e
 # ╠═72f41f22-e3a0-4e5b-9751-5f625beb7610
-# ╠═42c0d848-4672-4657-a37c-39e6f4fc03c4
+# ╟─42c0d848-4672-4657-a37c-39e6f4fc03c4
 # ╟─6018d10d-a0ce-460a-be91-9f98c8663f20
-# ╟─1fe0dbc1-1405-49f1-9ec6-ccb64a2657ab
+# ╠═1fe0dbc1-1405-49f1-9ec6-ccb64a2657ab
 # ╠═028ac6ec-b4ed-4ba7-8f4c-df23bac20b52
 # ╟─641c6778-3db3-4640-8377-3c709f5cab0b
 # ╟─ab590764-a9df-42ee-b73f-7594d0a6cc0b
-# ╟─c3dff3cf-6c59-436d-8d62-8ec92727145b
+# ╠═c3dff3cf-6c59-436d-8d62-8ec92727145b
 # ╠═dbd9ddcf-cefe-4f56-adb3-fed3a6671552
 # ╟─db4a61a7-3b63-4609-9ca2-08cc400bf2f2
-# ╟─1a99c3fd-5ba0-4458-abcf-7549b709290b
+# ╠═1a99c3fd-5ba0-4458-abcf-7549b709290b
 # ╠═a3028938-6ca3-4f7f-ad08-f8b5d9c03470
+# ╠═5539709d-99c4-47e9-a5dc-3284637bbfdf
 # ╠═3015ef04-4775-45de-9778-c5d346ae23ca
-# ╠═2e6bdf9c-9b4e-48c7-a9fd-a4517c1b08ac
+# ╠═be782bbd-2f04-4e34-a0d9-8ac391159b04
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

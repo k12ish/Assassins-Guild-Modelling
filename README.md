@@ -1,5 +1,10 @@
 # Statistical modelling for the Assassins' Guild
 
+In the current version of AutoUmpire, the targeting graph will undergo "breakdown".
+When an assassin is killed, it is unable to fix the underlying targeting graph.
+
+The objectives of this research is to determine factors that impact targeting graph breakdown.
+
 ### Creating the Graph
 
 The graph must meet a few requirements:
@@ -8,13 +13,8 @@ The graph must meet a few requirements:
 - A player cannot target themselves
 - The graph cannot be easily reverse-engineered
 
-
-
-### Modelling Assassin Activity
-
-Some assassins may successfully execute dozens of targets, but many assassins fail to kill anyone at all.
-This empirically follows some sort of [80/20 rule](https://en.wikipedia.org/wiki/Pareto_principle), where the top assassins conduct majority of assassinations.
-Hence, we can use a [Pareto Distribution](https://en.wikipedia.org/wiki/Pareto_distribution) to model this behaviour.
+It was thought that breakdown could be delayed by varying the initial graph state.
+This has not (yet) been demonstrated.
 
 ### Retargeting Assassins
 
@@ -82,7 +82,7 @@ Assassin 7 targets 13.
 Assassin 2 targets 6.
 ```
 
-The corresponding object returned code would be:
+The corresponding object returned would be:
 
 ```
 RetargetingState(
@@ -94,6 +94,4 @@ RetargetingState(
     pairs           = [(4, 16), (7, 13), (2, 6)]
 )
 ```
-
-There is only one solution to this problem. If we added more constraints, the problem could be unsolveable.
-
+This method of retargeting is effective because it generalizes to processing multiple kills in a batch.
